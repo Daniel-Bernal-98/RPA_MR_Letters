@@ -1,0 +1,6 @@
+easyocr
+numpy
+pdf2image
+Pillow
+torch
+torchvision
