@@ -1,0 +1,31 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# PyInstaller output
+build/
+dist/
+*.spec.bak
+
+# Test artifacts
+.pytest_cache/
+*.egg-info/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Temporary output folders created during development
+Processed_Claims/
+output/

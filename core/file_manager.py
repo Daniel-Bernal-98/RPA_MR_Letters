@@ -1,20 +1,43 @@
 import os
+import shutil
 
-def save_file(pdf_path, patient, date_of_service_, claim_number):
+from utils.helpers import sanitize_filename
+
+
+def save_file(source_path, patient, date_of_service, collector, output_dir):
+    """Copy *source_path* into ``<output_dir>/<collector>/`` with a sanitised filename.
+
+    The new filename follows the pattern ``<patient>_<dos>_<original_basename>``.
+    The collector sub-folder is created automatically if it does not exist.
+
+    Parameters
+    ----------
+    source_path : str
+        Path of the file to copy.
+    patient : str
+        Patient name (used in the destination filename).
+    date_of_service : str
+        Date of Service string (used in the destination filename).
+    collector : str
+        Name of the collector; determines the sub-folder.
+    output_dir : str
+        Base output directory.
+
+    Returns
+    -------
+    str  – success message
+    str  – error message if an exception occurs
+    """
     try:
-        output_dir = "./Processed_Claims" #Directory to save organized files
-        patient_dir = os.path.join(output_dir, patient) #Create patient directory
-        
-        if not os.path.exists(patient_dir):
-            os.makedirs(patient_dir) #Create directory if it doesn't exist
+        collector_dir = os.path.join(output_dir, sanitize_filename(collector))
+        os.makedirs(collector_dir, exist_ok=True)
 
-        new_file_name = f"{patient}_{date_of_service_}_{claim_number}.pdf" #Create new file name
-        final_dir = os.path.join(patient_dir, new_file_name) #Create final directory for the file
+        original_ext = os.path.splitext(source_path)[1]
+        new_filename = sanitize_filename(f"{patient}_{date_of_service}") + original_ext
+        destination = os.path.join(collector_dir, new_filename)
 
-        os.rename(pdf_path, final_dir) #Move and rename the file
+        shutil.copy2(source_path, destination)
+        return f"File saved successfully: {destination}"
 
-        return f"File organized successfully: {new_file_name}" #Return success message
-    
-    except Exception as e:
-        #return an error message if something goes wrong
-        return f"Error processing file: {os.path.basename(pdf_path)} - {str(e)}"
+    except Exception as exc:
+        return f"Error saving file: {os.path.basename(source_path)} – {exc}"
