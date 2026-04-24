@@ -1,43 +1,31 @@
 import os
 import shutil
-
 from utils.helpers import sanitize_filename
 
 
-def save_file(source_path, patient, date_of_service, collector, output_dir):
-    """Copy *source_path* into ``<output_dir>/<collector>/`` with a sanitised filename.
-
-    The new filename follows the pattern ``<patient>_<dos>_<original_basename>``.
-    The collector sub-folder is created automatically if it does not exist.
-
-    Parameters
-    ----------
-    source_path : str
-        Path of the file to copy.
-    patient : str
-        Patient name (used in the destination filename).
-    date_of_service : str
-        Date of Service string (used in the destination filename).
-    collector : str
-        Name of the collector; determines the sub-folder.
-    output_dir : str
-        Base output directory.
-
-    Returns
-    -------
-    str  – success message
-    str  – error message if an exception occurs
+def save_file(source_path, patient, dos, collector, output_dir):
     """
+    Guarda el archivo en:
+    output_dir / collector / patient_dos.pdf
+    """
+
     try:
+        # Si no hay collector → UNASSIGNED
+        collector = collector if collector else "UNASSIGNED"
+
         collector_dir = os.path.join(output_dir, sanitize_filename(collector))
         os.makedirs(collector_dir, exist_ok=True)
 
-        original_ext = os.path.splitext(source_path)[1]
-        new_filename = sanitize_filename(f"{patient}_{date_of_service}") + original_ext
+        # Nombre final: Apellido_Nombre_DOS.pdf
+        new_filename = f"{patient}_{dos}.pdf"
+        new_filename = sanitize_filename(new_filename)
+
         destination = os.path.join(collector_dir, new_filename)
 
+        # Copiar archivo
         shutil.copy2(source_path, destination)
-        return f"File saved successfully: {destination}"
+
+        return f"OK → {destination}"
 
     except Exception as exc:
-        return f"Error saving file: {os.path.basename(source_path)} – {exc}"
+        return f"ERROR → {os.path.basename(source_path)} → {exc}"
