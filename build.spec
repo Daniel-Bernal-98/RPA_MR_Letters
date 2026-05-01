@@ -2,24 +2,30 @@
 # Usage: pyinstaller build.spec
 # Output: dist/MR_Letters_Generator/
 
-import sys
-import os
 from pathlib import Path
 
 block_cipher = None
 
-# ---------------------------------------------------------------------------
-# Collect all files inside assets/poppler so they are bundled with the app
-# ---------------------------------------------------------------------------
+
 def collect_assets():
-    """Return a list of (src, dest_in_bundle) tuples for assets."""
+    """
+    Bundle everything under ./assets into the app under an 'assets/' folder.
+
+    Returns a list of (src, dest_relative_to_app) tuples.
+    """
     datas = []
     assets_root = Path("assets")
-    if assets_root.exists():
-        for path in assets_root.rglob("*"):
-            if path.is_file():
-                rel = str(path.parent)
-                datas.append((str(path), rel))
+    if not assets_root.exists():
+        return datas
+
+    for p in assets_root.rglob("*"):
+        if p.is_file():
+            # destination folder inside the bundle:
+            # e.g. assets/poppler/Library/bin
+            rel_parent = p.parent.relative_to(assets_root)
+            dest = str(Path("assets") / rel_parent)
+            datas.append((str(p), dest))
+
     return datas
 
 
@@ -44,7 +50,7 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[
         # Exclude heavy ML libraries from the UI-only build to keep it smaller.
-        # Remove these lines if the OCR pipeline is needed in the distributed build.
+        # Remove these lines if OCR / EasyOCR is needed in the distributed build.
         "torch",
         "torchvision",
         "easyocr",
@@ -67,7 +73,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,  # No console window – GUI application
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
