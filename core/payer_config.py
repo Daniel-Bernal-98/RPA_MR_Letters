@@ -1,3 +1,16 @@
+# ============================================================================
+# MR Letters Generator
+#
+# Copyright (c) 2026 ABA Centers of America
+# All Rights Reserved.
+#
+# Proprietary and Confidential.
+# For internal use only.
+#
+# Unauthorized copying, distribution, modification, or disclosure
+# of this software is strictly prohibited.
+# ============================================================================
+
 #Module Description (Expand)
 """
 Multi-Payer Configuration Module
@@ -44,13 +57,13 @@ PAYER_OCR_CONFIGS = {
     },
     #Same as UMR,letter format is very similar to UMR, so we can use the same zones and thresholds for text grouping
     "Optum": {
-        "psm": 6,          # Uniform block of text
-        "oem": 3,          # Auto OCR engine
-        "lang": "eng",     # English language
-        "alpha": 1.6,      # Brightness scale
-        "beta": 10,        # Brightness offset
-        "blur_kernel": 3,  # Gaussian blur kernel (must be odd)
-        "threshold_block_size": 31,  # Adaptive threshold block size (must be odd)
+        "psm": 6,          
+        "oem": 3,          
+        "lang": "eng",     
+        "alpha": 1.6,      
+        "beta": 10,        
+        "blur_kernel": 3,  
+        "threshold_block_size": 31,  
     },
     "Aetna": {
         "psm": 6,
@@ -70,7 +83,16 @@ PAYER_OCR_CONFIGS = {
         "blur_kernel": 3,
         "threshold_block_size": 31,
     },
-    "BCBS NH": {
+    "BCBS TX": {
+        "psm": 6,
+        "oem": 3,
+        "lang": "eng",
+        "alpha": 2.0,
+        "beta": 20,
+        "blur_kernel": 3,
+        "threshold_block_size": 31,
+    },
+    "Florida Blue": {
         "psm": 6,
         "oem": 3,
         "lang": "eng",
@@ -111,9 +133,9 @@ PAYER_TEXT_PATTERNS = {
         # Pattern for patient name extraction from text
         "patient_pattern": r"PATIENT[:\s]+([A-Z\s]+?)(?=\n|$|\s{2,})",
         # Pattern for Date of Service extraction
-        "dos_pattern": r"(?:SERV|SERVICE)\s*(?:DT|DATE|DATES)[:\s]*([0-9]{2}[-/][0-9]{2}[-/][0-9]{4})",
+        "dos_pattern": r"(?:DATE\s+OF\s+SERVICE|SERV|SERVICE)[:\s]*([0-9]{2}[-/][0-9]{2}[-/][0-9]{4})",
         # Additional patterns can be added here for fallback
-        "patient_pattern_alt": r"(?:MEMBER|INSURED)[:\s]+([A-Z\s]+?)(?=\n|$)",
+        "patient_pattern_alt": r"(?:PATIENT|PT)[:\s]+([A-Z\s]+?)(?=\n|$)",
     },
     "Aetna": {
         "patient_pattern": r"PATIENT[:\s]+([A-Z\s]+?)(?=\n|$|\s{2,})",
@@ -125,10 +147,15 @@ PAYER_TEXT_PATTERNS = {
         "dos_pattern": r"(?:SERVICE|DATE OF SERVICE|DOS)[:\s]*([0-9]{2}[-/][0-9]{2}[-/][0-9]{4})",
         "patient_pattern_alt": r"NAME[:\s]+([A-Z\s]+?)(?=\n|$)",
     },
-    "BCBS NH": {
-        "patient_pattern": r"PATIENT[:\s]+([A-Z\s]+?)(?=\n|$|\s{2,})",
-        "dos_pattern": r"(?:SERV|SERVICE|DATE)\s*(?:DT|DATE)[:\s]*([0-9]{2}[-/][0-9]{2}[-/][0-9]{4})",
-        "patient_pattern_alt": r"(?:MEMBER|SUBSCRIBER)[:\s]+([A-Z\s]+?)(?=\n|$)",
+    "BCBS TX": {
+        "patient_pattern": r"Patient\s+Name[:\s]+([A-Za-z\s]+?)(?=\n\n|Patient\s+Number|Service\s+Date|$)",
+        "dos_pattern": r"Service\s+Date[:\s]*([0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{4})",
+        "patient_pattern_alt": r"PATIENT[:\s]+([A-Z\s]+?)(?=\n|$)",
+    },
+    "Florida Blue": {
+        "patient_pattern": r"PATIENT NAME[:\s]+([A-Z\s]+?)(?=\n|PATIENT NUMBER|SERVICE DATE)",
+        "dos_pattern": r"SERVICE DATE[:\s]*([0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{4})",
+        "patient_pattern_alt": r"PATIENT[:\s]+([A-Z\s]+?)(?=\n|$)",
     },
     "default": {
         "patient_pattern": r"PATIENT[:\s]+([A-Z]+)\s+([A-Z]+)",
@@ -226,21 +253,37 @@ PAYER_ZONE_CONFIGS = {
         "same_line_threshold": 10,
         "below_line_threshold": 25,
     },
-    "BCBS NH": {
+    "BCBS TX": {
         "patient_search_zone": {
             "left_percent": 0.55,
             "right_percent": 1.0,
-            "top_percent": 0.0,
-            "bottom_percent": 0.6,
+            "top_percent": 0.10,
+            "bottom_percent": 0.55,
         },
         "date_search_zone": {
             "left_percent": 0.55,
             "right_percent": 1.0,
-            "top_percent": 0.0,
-            "bottom_percent": 0.35,
+            "top_percent": 0.10,
+            "bottom_percent": 0.55,
         },
-        "same_line_threshold": 10,
-        "below_line_threshold": 25,
+        "same_line_threshold": 20,
+        "below_line_threshold": 40,
+    },
+    "Florida Blue": {
+        "patient_search_zone": {
+            "left_percent": 0.0,
+            "right_percent": 1.0,
+            "top_percent": 0.10,
+            "bottom_percent": 0.55,
+        },
+        "date_search_zone": {
+            "left_percent": 0.55,
+            "right_percent": 1.0,
+            "top_percent": 0.10,
+            "bottom_percent": 0.55,
+        },
+        "same_line_threshold": 15,
+        "below_line_threshold": 20,
     },
     "default": {
         "patient_search_zone": {

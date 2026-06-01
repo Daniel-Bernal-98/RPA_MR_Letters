@@ -1,3 +1,16 @@
+# ============================================================================
+# MR Letters Generator
+#
+# Copyright (c) 2026 ABA Centers of America
+# All Rights Reserved.
+#
+# Proprietary and Confidential.
+# For internal use only.
+#
+# Unauthorized copying, distribution, modification, or disclosure
+# of this software is strictly prohibited.
+# ============================================================================
+
 import os
 from datetime import datetime, timedelta, date
 from concurrent.futures import ProcessPoolExecutor, as_completed

@@ -1,3 +1,16 @@
+# ============================================================================
+# MR Letters Generator
+#
+# Copyright (c) 2026 ABA Centers of America
+# All Rights Reserved.
+#
+# Proprietary and Confidential.
+# For internal use only.
+#
+# Unauthorized copying, distribution, modification, or disclosure
+# of this software is strictly prohibited.
+# ============================================================================
+
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter import ttk
@@ -8,7 +21,7 @@ from core.processor import process_folder
 import locale
 
 #default list of payers, can be extended if needed
-DEFAULT_PAYERS = ["UMR/Optum", "Aetna", "Cigna", "BCBS"]
+DEFAULT_PAYERS = ["UMR","Optum", "Aetna", "Cigna", "BCBS TX", "Florida Blue"]
 
 def main():
     root =tk.Tk()
@@ -84,10 +97,17 @@ def main():
                 status_var.set("Completed Successfully")
                 log_message("Processing completed successfully.")
 
+                messagebox.showinfo(
+                    "Process Completed",
+                    f"Processing completed successfully for payer: {payer}.\n\n"
+                    f"CSV log has been generated in the output folder.\n\n"
+                    f"Processed files: {len(results)}\n"
+                )
+
             except Exception as e:
                 status_var.set("Error during processing")
                 log_message(f"Error occurred: {str(e)}")
-                messagebox.showerror("Error", f"An error occurred during processing: {str(e)}")
+                root.after(0, lambda: messagebox.showerror("Error", f"An error occurred during processing:\n\n {str(e)}"))
             finally:
                 progress.stop()
                 run_button.config(state=tk.NORMAL)
@@ -130,8 +150,8 @@ def main():
         ttk.Entry(row, textvariable=var, width=40).pack(side="left", fill ="x", expand=True, padx=5)
         ttk.Button(row, text="Browse", command=command, width=10).pack(side="left")
 
+    build_row("Assignations CSV:", csv_file, select_csv_file)
     build_row("Input Folder:", input_folder, select_input_folder)
-    build_row("CSV File:", csv_file, select_csv_file)
     build_row("Output Folder:", output_folder, select_output_folder)
 
     # Payer Selection

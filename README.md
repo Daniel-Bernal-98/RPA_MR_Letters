@@ -1,162 +1,471 @@
 # MR Letters Generator
 
-A portable Windows application that assigns PDF letters to collectors based on a spreadsheet (CSV / XLSX) and information extracted from each PDF.  
-Each PDF is copied into a sub-folder named after the **assigned collector** and renamed using the **patient name** and **Date of Service (DOS)**.
+## Overview
 
-> Note: The app uses **Poppler** (via `pdf2image`) and optionally **Tesseract OCR** for fallback extraction when text cannot be read directly from the PDF.
+MR Letters Generator is a Windows desktop application designed to automate the processing and assignment of Medical Records (MR) request letters received from multiple insurance payers.
 
----
+The application:
 
-## Features
+* Reads PDF letters from a selected folder.
+* Extracts patient information and dates from each document.
+* Matches patients against an assignment spreadsheet.
+* Assigns each letter to the correct collector.
+* Renames and organizes files automatically.
+* Flags old letters based on configurable age thresholds.
+* Generates a processing log for auditing and troubleshooting.
 
-| Feature | Description |
-|---------|-------------|
-| **Spreadsheet input** | Load assignments from `.csv`, `.xlsx`, or `.xls` |
-| **PDF parsing** | Extract patient name and DOS from the PDF (fast text extraction first; OCR fallback if needed) |
-| **Collector-based output folders** | `<output_dir>/<Collector_Name>/<PatientName_DOS>.pdf` |
-| **Windows UI** | Simple Tkinter interface – no command line needed |
-| **Portable executable** | PyInstaller build bundles the app and required assets into one folder |
-
----
-
-## Spreadsheet Schema
-
-The input file must contain the following columns (header row required, case-insensitive).  
-Minimum required by the current code in `core/data_loader.py`:
-
-| Column | Required | Description |
-|--------|----------|-------------|
-| `patient_name` | ✅ | Patient name used for matching (the app normalizes it internally) |
-| `collector` | ✅ | Collector name for output folder assignment |
-
-A ready-to-use sample file is provided: [`sample_input.csv`](sample_input.csv)
-
-> Tip: Keep patient names consistent. The app uses fuzzy matching (RapidFuzz) to match extracted names to the spreadsheet.
+The system supports both direct PDF text extraction and OCR fallback for scanned or image-based documents.
 
 ---
 
-## Output Structure
+# Key Features
 
+## Multi-Payer Support
+
+Supports payer-specific extraction rules through configurable profiles.
+
+Currently supported:
+
+* UMR / Optum
+* Aetna
+* BCBS
+* Cigna
+* Default profile
+
+Each payer can define:
+
+* OCR settings
+* Regex extraction patterns
+* Search zones
+* OCR thresholds
+* Layout-specific logic
+
+---
+
+## Intelligent Extraction Pipeline
+
+The application uses a layered extraction strategy:
+
+### 1. Fast Text Extraction
+
+Attempts direct text extraction from PDF pages.
+
+Advantages:
+
+* Extremely fast
+* High accuracy
+* Minimal resource usage
+
+### 2. OCR Fallback
+
+If required data is not found through text extraction:
+
+* Converts PDF pages to images
+* Applies payer-specific OCR preprocessing
+* Extracts patient and date information from configured search zones
+
+---
+
+## Multi-Page Document Support
+
+The system scans all pages of a PDF until required information is found.
+
+Supported for:
+
+* Patient extraction
+* Date of Service (DOS) extraction
+* Issue Date extraction
+* OCR fallback processing
+
+---
+
+## Automatic Collector Assignment
+
+Patients are matched against an assignment spreadsheet using:
+
+* Exact matching
+* Name normalization
+* Fuzzy matching fallback
+
+Example:
+
+```text
+MICHAEL COTONE
 ```
-<output_directory>/
-├── Maria_Garcia/
-│   ├── John_Smith_01-15-2024.pdf
-│   └── Jane_Doe_03-22-2024.pdf
-├── Carlos_Rivera/
-│   ├── Robert_Johnson_02-10-2024.pdf
-│   └── Emily_Williams_04-05-2024.pdf
+
+can match:
+
+```text
+COTONE_MICHAEL
+```
+
+without requiring manual intervention.
+
+---
+
+## Old Letter Detection
+
+Letters can be automatically classified based on age.
+
+Configurable threshold:
+
+```text
+365 days
+```
+
+Example:
+
+```text
+Issue Date: 2024-01-01
+Today: 2025-06-01
+```
+
+Result:
+
+```text
+Old Letter = True
+```
+
+---
+
+## Processing Logs
+
+At the end of each run the application generates a CSV log including:
+
+* File name
+* Patient
+* DOS
+* Collector
+* Payer
+* Issue date
+* Old letter status
+
+This provides complete auditability of every processed document.
+
+---
+
+# Project Structure
+
+```text
+RPA_MR_Letters/
+│
+├── app/
+│   └── ui.py
+│
+├── core/
+│   ├── data_loader.py
+│   ├── extractor.py
+│   ├── file_manager.py
+│   ├── ocr.py
+│   ├── payer_config.py
+│   ├── pdf_processor.py
+│   └── processor.py
+│
+├── utils/
+│   ├── helpers.py
+│   └── logger.py
+│
+├── assets/
+│   ├── poppler/
+│   └── icons/
+│
+├── main.py
+│
+└── README.md
+```
+
+---
+
+# Spreadsheet Requirements
+
+The assignment spreadsheet must contain:
+
+| Column       | Required |
+| ------------ | -------- |
+| patient_name | Yes      |
+| collector    | Yes      |
+
+Example:
+
+| patient_name         | collector     |
+| -------------------- | ------------- |
+| LastName1_FirstName1 | COLLECTOR_ONE |
+| LastName2_FirstName2 | COLLECTOR_TWO |
+
+---
+
+# Output Structure
+
+Example:
+
+```text
+Output/
+│
+├── COLLECTOR_ONE/
+│   ├── LastName1_FirstName1_04-15-2025.pdf
+│   └── LastName2_FirstName2_03-12-2025.pdf
+│
+├── COLLECTOR_TWO/
+│   └── LastName3_FirstName3_05-08-2025.pdf
+│
 └── UNASSIGNED/
-    └── Unknown_00-00-0000.pdf
+    └── UNKNOWN_00-00-0000.pdf
 ```
 
 ---
 
-## Running on Windows (portable build)
+# Payer Configuration
 
-### Option 1 – Pre-built executable (recommended)
+Payer-specific settings are stored in:
 
-1. Download the latest `MR_Letters_Generator.zip` artifact from the [GitHub Actions page](../../actions).
-2. Extract the zip to any folder.
-3. Run **`MR_Letters_Generator.exe`** (inside the extracted folder).
-4. The UI will open — no Python installation required.
+```text
+core/payer_config.py
+```
 
-> Important: Distribute/run the **entire folder**, not just the `.exe`. The build includes an `assets/` folder required at runtime.
+Configuration categories:
 
-### Option 2 – Run from source
+## OCR Configuration
 
-**Requirements:** Python 3.9+ on Windows
+Defines:
+
+* Tesseract PSM
+* OCR Engine Mode
+* Contrast
+* Thresholding
+* Blur settings
+
+## Text Patterns
+
+Regex patterns used for direct extraction:
+
+* Patient name
+* Date of Service
+* Alternate layouts
+
+## OCR Zones
+
+Defines where the application searches for:
+
+* Patient information
+* Issue dates
+
+Zones are expressed as percentages of page dimensions.
+
+---
+
+# Installation
+
+## Requirements
+
+* Python 3.10+
+* Windows 10/11
+
+---
+
+## Install Dependencies
 
 ```bash
-# Install dependencies
 pip install -r requirements.txt
+```
 
-# Launch the UI
+---
+
+## Run Application
+
+```bash
 python main.py
 ```
 
 ---
 
-## Using the UI
+# Building the Executable
 
-1. Click **Browse** next to **Input Folder** and select the folder containing your PDFs.
-2. Click **Browse** next to **CSV File** and select your assignment `.csv`.
-3. Click **Browse** next to **Output Folder** and select where results should be saved.
-4. Click **Run Process**.
-5. Progress and any errors are shown in the log panel.
+The project is designed to be packaged with PyInstaller.
 
-A CSV log will also be generated in the output folder.
-
----
-
-## Assets (Poppler / Tesseract)
-
-The app expects these paths (relative to the application base directory):
-
-- Poppler:
-  - `assets/poppler/Library/bin`
-- Tesseract (OCR fallback):
-  - `assets/tesseract/tesseract.exe`
-  - `assets/tesseract/tessdata/`
-
-When running as a PyInstaller `.exe`, the code should resolve assets using `sys._MEIPASS` (frozen mode) so it can find bundled assets correctly.
-
----
-
-## Building the portable executable (developers)
-
-### 1) Install build dependencies
+Example:
 
 ```bash
-pip install -r requirements.txt
-pip install pyinstaller
+pyinstaller --onefile --windowed main.py
 ```
 
-### 2) Clean previous builds (recommended)
+The final build must include:
 
-**Command Prompt (Windows):**
-```bat
-rmdir /S /Q build
-rmdir /S /Q dist
+```text
+assets/
 ```
 
-### 3) Build
+particularly:
 
-```bash
-pyinstaller build.spec
+```text
+assets/poppler/
 ```
 
-The portable folder will be created at:
-
-- `dist/MR_Letters_Generator/`
-
-Zip that folder and distribute it.
-
-> Important: If users see errors like “A process in the process pool was terminated abruptly…”, it is commonly caused by missing bundled assets (Poppler/Tesseract) or Windows multiprocessing in frozen apps. Ensure your entrypoint calls `multiprocessing.freeze_support()` and that `assets/` is included in the final `dist/` folder.
+which is required for PDF-to-image conversion.
 
 ---
 
-## Project Structure
+# OCR Dependencies
 
+The application relies on:
+
+## Poppler
+
+Used by:
+
+```python
+pdf2image
 ```
-.
-├── main.py                  # Entry point – launches the UI
-├── config.py                # (reserved for future configuration)
-├── requirements.txt
-├── sample_input.csv         # Example spreadsheet
-├── build.spec               # PyInstaller spec
-├── app/
-│   └── ui.py                # Tkinter user interface
-├── core/
-│   ├── data_loader.py       # CSV/XLSX parsing & validation
-│   ├── processor.py         # Batch processing (ProcessPoolExecutor)
-│   ├── file_manager.py      # File saving helpers
-│   ├── extractor.py         # PDF text extraction + OCR fallback
-│   ├── ocr.py               # Tesseract OCR wrapper
-│   └── pdf_processor.py     # PDF-to-image helper (Poppler)
-├── utils/
-│   ├── helpers.py           # sanitize_filename()
-│   └── logger.py            # Logging setup (if used)
-└── assets/
-    ├── poppler/             # Bundled Poppler binaries (Windows)
-    └── tesseract/           # Bundled Tesseract + tessdata (if used)
+
+for PDF page rendering.
+
+Location:
+
+```text
+assets/poppler/
 ```
+
+---
+
+## EasyOCR / Tesseract-Based Processing
+
+Used when direct text extraction is insufficient.
+
+Capabilities:
+
+* Scanned documents
+* Faxed documents
+* Low-quality PDFs
+* Multi-page records
+
+---
+
+# Processing Workflow
+
+```text
+PDF
+ ↓
+Fast Text Extraction
+ ↓
+Patient Found?
+DOS Found?
+ ↓
+Yes
+ ↓
+Spreadsheet Matching
+ ↓
+Collector Assignment
+ ↓
+File Rename
+ ↓
+Output Folder
+```
+
+If extraction fails:
+
+```text
+PDF
+ ↓
+OCR Fallback
+ ↓
+Patient Extraction
+ ↓
+DOS Extraction
+ ↓
+Matching
+ ↓
+Output
+```
+
+---
+
+# Generated Logs
+
+Each execution produces:
+
+```text
+asignaciones_YYYY-MM-DD_HH-MM.csv
+```
+
+Including:
+
+* Original file
+* Extracted patient
+* DOS
+* Collector
+* Payer
+* Issue date
+* Old letter status
+
+---
+
+# Troubleshooting
+
+## OCR Not Working
+
+Verify:
+
+```text
+assets/poppler/
+```
+
+exists and contains Poppler binaries.
+
+---
+
+## All Files Assigned to UNASSIGNED
+
+Verify:
+
+* Spreadsheet columns are correct.
+* Patient names exist in the spreadsheet.
+* Payer profile is correctly selected.
+* OCR extraction is working.
+
+---
+
+## DOS Returns 00-00-0000
+
+Possible causes:
+
+* Incorrect payer regex.
+* DOS not present on scanned page.
+* OCR search zone requires adjustment.
+
+Review:
+
+```text
+core/payer_config.py
+```
+
+---
+
+# Future Enhancements
+
+Potential future improvements:
+
+* Automatic payer detection
+* OCR confidence scoring
+* Visual zone editor
+* Batch profile management
+* JSON/YAML payer configuration
+* Dashboard reporting
+* Processing statistics
+
+---
+
+# Author
+
+Daniel Bernal
+
+Medical Records Automation Project
+
+Built to streamline payer letter assignment workflows and reduce manual processing time.
+
+## License
+
+This software is proprietary and confidential.
+
+Copyright (c) 2026 ABA Centers of America.
+All Rights Reserved.
+
+This application is intended solely for internal use by authorized personnel of ABA Centers of America. Unauthorized distribution, modification, reproduction, or disclosure is prohibited.

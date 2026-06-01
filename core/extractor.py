@@ -1,3 +1,16 @@
+# ============================================================================
+# MR Letters Generator
+#
+# Copyright (c) 2026 ABA Centers of America
+# All Rights Reserved.
+#
+# Proprietary and Confidential.
+# For internal use only.
+#
+# Unauthorized copying, distribution, modification, or disclosure
+# of this software is strictly prohibited.
+# ============================================================================
+
 import re
 import cv2
 import numpy as np
@@ -47,15 +60,6 @@ def extract_text_fast(pdf_path):
         print(f"Fast Extraction Error: {e}")
     
         return []
-
-# def extract_text_fast(pdf_path):
-#     """Fast text extraction without OCR."""
-#     try:
-#         reader = PdfReader(pdf_path)
-#         page = reader.pages[0]
-#         return (page.extract_text() or "").strip()
-#     except:
-#         return ""
 
 
 def preprocess_image(img):
@@ -108,29 +112,26 @@ def extract_data_with_payer(pdf_path, payer='default'):
                 print(f"[{payer}] Fast extraction success on page {page_num +1}")
                 used_fast = True
                 break
-
-        # if texto:
-
-        #     patient, dos = _extract_from_text(texto, payer)
-
-        #     valid_patient = patient != "UNKNOWN"
-        #     valid_dos = dos != "00-00-0000"
-
-        #     if valid_patient and valid_dos:
-        #         print(f"[{payer}] Using fast extraction (No OCR)")
-        #         used_fast = True
         
         if not used_fast:
             print(f"[{payer}] Fast extraction incomplete, Using OCR")
 
             images = pdf_to_image(pdf_path)
+            print(f"[{payer}] Total pages converted to images: {len(images)}")
             payer_config = get_payer_ocr_config(payer)
 
             for page_num, img in enumerate(images):
                 print(f"[{payer}] OCR Scanning page {page_num + 1}")
 
                 data = ocr.read_with_boxes(img, payer_config=payer_config)
-                ocr_patient, ocr_dos = _extract_from_ocr_data(data, img, payer)
+                if payer == "BCBS TX":
+                    print(f"[{payer}] Using enhanced OCR zone extraction for {payer}")
+                    ocr_patient, ocr_dos = _extract_from_ocr_data_bsbc_tx(data, img, payer)
+                elif payer == "Florida Blue":
+                    print(f"[{payer}] Using enhanced OCR zone extraction for {payer}")
+                    ocr_patient, ocr_dos = _extract_from_ocr_data_florida_blue(data, img, payer)
+                else:
+                    ocr_patient, ocr_dos = _extract_from_ocr_data(data, img, payer)
 
                 valid_patient = ocr_patient != "UNKNOWN"
                 valid_dos = ocr_dos != "00-00-0000"
@@ -143,35 +144,8 @@ def extract_data_with_payer(pdf_path, payer='default'):
 
                 if patient != "UNKNOWN" and dos != "00-00-0000":
                     print(f"[{payer}] OCR extraction success on page {page_num + 1}")
-
-                break
+                    break
                     
-
-            # img = pdf_to_image(pdf_path)
-            # payer_config = get_payer_ocr_config(payer)
-            # data = ocr.read_with_boxes(img, payer_config=payer_config)
-            # ocr_patient, ocr_dos = _extract_from_ocr_data(data, img, payer)
-
-            # if patient == "UNKNOWN":
-            #     patient = ocr_patient
-            # if dos == "00-00-0000":
-            #     dos = ocr_dos
-
-        # else:
-        #     # Step 2: Fall back to OCR with payer-specific config
-        #     print(f"[{payer}] Using OCR fallback")
-
-        #     img = pdf_to_image(pdf_path)
-
-        #     # Get payer-specific OCR config
-        #     payer_config = get_payer_ocr_config(payer)
-
-        #     data = ocr.read_with_boxes(img, payer_config=payer_config)
-
-        #     patient, dos = _extract_from_ocr_data(data, img, payer)
-
-        # print(f"[{payer}] PATIENT: {patient}, DOS: {dos}")
-
         return patient, dos
 
     except Exception as e:
@@ -233,7 +207,280 @@ def _extract_from_text(text, payer):
 
     return patient, dos
 
+def _extract_from_ocr_data_bsbc_tx(data, img, payer):
+    """
+    BCBS TX specific OCR extraction.
+    
+    These payers have "Patient" and "Name:" on separate OCR items,
+    followed by first and last names on the same or nearby lines.
+    
+    Args:
+        data: List of OCR results with bounding boxes
+        img: Original image (for zone calculations)
+        payer: Payer identifier
+    
+    Returns:
+        Tuple of (patient_name, date_of_service)
+    """
+    patient = "UNKNOWN"
+    dos = "00-00-0000"
 
+    h, w = img.shape[:2]
+
+    # Get payer specific zone config
+    zone_config = get_payer_zone_config(payer)
+    patient_zone = zone_config["patient_search_zone"]
+
+    #Calculate boundaries in pixels
+    zone_left = int(w * patient_zone["left_percent"])
+    zone_right = int(w * patient_zone["right_percent"])
+    zone_top = int(h * patient_zone["top_percent"])
+    zone_bottom = int(h * patient_zone["bottom_percent"])
+
+    # Filter OCR data to patient search zone
+    zone_data = [
+        d for d in data
+        if zone_left <= d["left"] <= zone_right
+        and zone_top <= d["top"] <= zone_bottom
+    ]
+
+    same_line_threshold = zone_config["same_line_threshold"]
+    below_line_threshold = zone_config["below_line_threshold"]
+
+    # BCBS TX specific logic: Look for "Patient" and "Name:" then find nearby words
+    for i, item in enumerate(zone_data):
+        text =item["text"].upper()
+        top = item["top"]
+        left = item["left"]
+
+        # Look for "PATIENT" label
+        if "PATIENT" in text:
+            # Find "NAME" label that follows
+            name_label_idx = None
+            for j in range(i + 1, min (i+ 5, len(zone_data))):
+                if "NAME" in zone_data[j]["text"].upper():
+                    name_label_idx = j
+                    break
+
+            #if "NAME" label found, use its position
+            if name_label_idx is not None:
+                top = zone_data[name_label_idx]["top"]
+                left = zone_data[name_label_idx]["left"]
+
+            # get items below or same line as "NAME" label
+            same_line = [
+                d for d in zone_data
+                if abs(d["top"] - top) < same_line_threshold and d["left"] > left
+            ]
+            below_line = [
+                d for d in zone_data
+                if same_line_threshold < (d["top"] - top) < below_line_threshold and d["left"] > left
+            ]
+
+            candidates = same_line + below_line
+            candidates = sorted(candidates, key=lambda x: (x["top"], x["left"]))
+
+            words = []
+
+            for w_item in candidates:
+                # Allow lowercase letters from OCR
+                word = re.sub(r"[^A-Za-z]", "", w_item["text"])
+                if word.upper() in ["ABOVE", "LISTED", "THE", "PATIENT", "NAME"]:
+                    continue
+                if len(word) >= 2:
+                    words.append(word)
+                if len(words) == 2:
+                    break
+
+            if len(words) == 2:
+                # Format as LASTNAME_FIRSTNAME
+                patient = normalizar_nombre(f"{words[1]}_{words[0]}")
+                print(f"[{payer}] Found patient using BCBS TX logic: {patient}")
+
+        #Look for DOS label (Service date for BCBS TX)
+        if "SERVICE" in text:
+            date_label_idx = None
+
+            for j in range(i+1, min(i+5, len(zone_data))):
+                if "DATE" in zone_data[j]["text"].upper():
+                    date_label_idx = j
+                    break
+            
+            if date_label_idx is not None:
+
+                date_top = zone_data[date_label_idx]["top"]
+                date_left = zone_data[date_label_idx]["left"]
+
+                same_line = [
+                    d for d in zone_data
+                    if abs(d["top"] - date_top) < same_line_threshold and d["left"] > date_left
+                ]
+
+                for w_item in same_line:
+                    match = re.search(r"([0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{4})", w_item["text"])
+                    if match:
+                        dos = match.group(1).replace("/", "-")
+                        print(f"[{payer}] Found DOS using BCBS TX logic: {dos}")
+                        break
+    """
+     BCBS TX DOS FALLBACK
+     OCR sometimes reads:
+    
+     04/19/2025 -> 4190025
+     04/21/2025 -> 4212025
+    
+     If normal extraction failed, look below the patient block
+     for a 7-8 digit number and reconstruct the date.
+    """
+    if patient != "UNKNOWN" and dos == "00-00-0000":
+        
+        patient_top = None
+        
+        for item in zone_data:
+            if "PATIENT" in item["text"].upper():
+                patient_top = item["top"]
+                break
+        if patient_top is not None:
+            for item in zone_data:
+                text = item["text"].strip()
+
+                #Search only below patient area
+                if patient_top < item["top"] < patient_top + 80:
+                    match = re.search(r"(\d{1,2}[/-]\d{1,2}[/-]\d{4})", text)
+                    if match:
+                        dos = match.group(1).replace("/", "-")
+                        print(f"[{payer}] Found DOS using BCBS TX fallback logic: {dos}")
+                        break
+
+                    # OCR Artifact: 4190025 -> 04/19/2025
+                    if re.fullmatch(r"\d{7,8}", text):
+                        raw = text
+                        try:
+                            if len(raw) == 7:
+                                month = raw[0]
+                                day = raw[1:3]
+                                year = raw[3:]
+                            elif len(raw) == 8:
+                                month = raw[:2]
+                                day = raw[2:4]
+                                year = raw[4:]
+                                if len(year) == 4 and year.startswith("00"):
+                                    year = "20" + year[2:]
+                            else:
+                                continue
+
+                            dos = (
+                                f"{month.zfill(2)}-"
+                                f"{day.zfill(2)}-"
+                                f"{year}"
+                            )
+
+                            print(f"[{payer}] Reconstructed DOS from OCR artifact: {dos}")
+
+                            break
+                        except Exception:
+                            pass
+
+    for item in zone_data:
+        print(item["text"], item["top"], item["left"])
+
+    print("\n===== OCR RAW DATA =====")
+
+    for item in data:
+        print(item)
+
+    print("========================\n")
+    return patient, dos
+
+def _extract_from_ocr_data_florida_blue(data, img, payer):
+    # Florida Blue specific OCR extraction
+
+    patient = "UNKNOWN"
+    dos = "00-00-0000"
+
+    h, w = img.shape[:2]
+
+    zone_config = get_payer_zone_config(payer)
+
+    patient_zone = zone_config["patient_search_zone"]
+
+    zone_left = int(w * patient_zone["left_percent"])
+    zone_right = int(w * patient_zone["right_percent"])
+    zone_top = int(h * patient_zone["top_percent"])
+    zone_bottom = int(h * patient_zone["bottom_percent"])
+
+    zone_data = [
+        d for d in data
+        if zone_left <= d["left"] <= zone_right
+        and zone_top <= d["top"] <= zone_bottom
+    ]
+    
+    same_line_threshold = zone_config["same_line_threshold"]
+
+    print("\n===== FLORIDA BLUE OCR =====")
+
+    for item in zone_data:
+        print(
+            item["text"],
+            item["top"],
+            item["left"]
+        )
+
+    print("===========================\n")
+
+    for i, item in enumerate(zone_data):
+
+        text = item["text"].upper()
+
+        #Patient extraction
+        if text.strip() == "PATIENT:":
+
+            top = item["top"]
+            left = item["left"]
+
+            same_line = [d for d in zone_data if abs(d["top"] - top) < same_line_threshold and d["left"] > left]
+            same_line = sorted(same_line, key=lambda x:x["left"])
+
+            words = []
+
+            for w in same_line:
+
+                word = re.sub(r"[^A-Z]", "", w["text"].upper())
+
+                if len(word) >= 2:
+                    words.append(word)
+
+            if len(words) >= 2:
+                
+                first_name = words[0]
+                last_name = words[1]
+
+                patient = normalizar_nombre(f"{last_name}_{first_name}")
+        
+        # Service Date Extraction
+        if text.strip() == "SERVICE":
+            top = item["top"]
+
+            nearby = [
+                d for d in zone_data
+                if abs(d["top"] - top) < same_line_threshold
+            ]
+
+            for d in nearby:
+                match = re.search(r"(\d{1,2}/\d{1,2}/\d{4})", d["text"])
+                if match:
+                    dos = match.group(1).replace("/", "-")
+                    break
+    
+    # print("\n===== OCR RAW DATA =====")
+
+    # for item in data:
+    #     print(item)
+
+    # print("========================\n")
+    return patient, dos
+
+# Default OCR extraction logic for other payers
 def _extract_from_ocr_data(data, img, payer):
     """
     Extract patient name and DOS from OCR bounding box data.
@@ -333,7 +580,12 @@ def _extract_from_ocr_data(data, img, payer):
                 if match:
                     dos = match.group(1).replace("/", "-")
                     break
+    print("\n===== OCR RAW DATA =====")
 
+    for item in data:
+        print(item)
+
+    print("========================\n")
     return patient, dos
 
 
@@ -396,7 +648,6 @@ def _parse_issue_date_from_text(text: str):
 def extract_issue_date(pdf_path, payer='default'):
     """Extract the letter issue date from the PDF using Tesseract OCR."""
     try:
-        texto = extract_text_fast(pdf_path)
         text_pages = extract_text_fast(pdf_path)
         for page_num, texto in text_pages:
             d = _parse_issue_date_from_text(texto.upper())

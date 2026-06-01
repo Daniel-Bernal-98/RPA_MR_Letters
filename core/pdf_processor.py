@@ -1,3 +1,16 @@
+# ============================================================================
+# MR Letters Generator
+#
+# Copyright (c) 2026 ABA Centers of America
+# All Rights Reserved.
+#
+# Proprietary and Confidential.
+# For internal use only.
+#
+# Unauthorized copying, distribution, modification, or disclosure
+# of this software is strictly prohibited.
+# ============================================================================
+
 from pdf2image import convert_from_path
 import numpy as np
 import os
@@ -42,10 +55,8 @@ def pdf_to_image(pdf_path):
 
     pages = convert_from_path(
         pdf_path,
-        first_page=1,
-        last_page=1,
         dpi=200,  # optimized for OCR
         poppler_path=os.path.normpath(poppler_path),
     )
 
-    return [np.array(img) for img in images]
+    return [np.array(img) for img in pages]
