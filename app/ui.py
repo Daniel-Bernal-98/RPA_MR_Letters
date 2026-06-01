@@ -5,52 +5,69 @@ import threading
 import csv
 from datetime import datetime
 from core.processor import process_folder
+import locale
 
+#default list of payers, can be extended if needed
+DEFAULT_PAYERS = ["UMR/Optum", "Aetna", "Cigna", "BCBS"]
 
 def main():
-    root = tk.Tk()
-    root.title("RPA PDF Organizer")
-    root.geometry("700x500")
-    root.resizable(False, False)
-
+    root =tk.Tk()
+    root.title("RPA Letter Mass Processor - Multi-Payer Support")
+    root.geometry("850x700")
+    root.resizable(True, True)
+    
     style = ttk.Style()
     try:
-        style.theme_use('vista')
+        root.tk.call("source", "forest-dark.tcl")
+        style.theme_use("forest-dark")
     except:
         pass
 
     input_folder = tk.StringVar()
     csv_file = tk.StringVar()
     output_folder = tk.StringVar()
+    selected_payer = tk.StringVar(value=DEFAULT_PAYERS[0])
 
-    # ---------- LOG UI ----------
+    # ----------------- UI Build -----------------
+    
+    ### LOG UI ###
+
     def log_message(msg):
         log_text.insert(tk.END, msg + "\n")
         log_text.see(tk.END)
 
-    # ---------- FUNCIONES ----------
-    def select_input():
+    ### FUNCTIONS ###
+
+    def select_input_folder():
         folder = filedialog.askdirectory()
         if folder:
             input_folder.set(folder)
 
-    def select_csv():
-        file = filedialog.askopenfilename(filetypes=[("CSV Files", "*.csv")])
+    def select_csv_file(): # Assignations CSV
+        file = filedialog.askopenfilename(
+            filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")]
+        )
         if file:
             csv_file.set(file)
 
-    def select_output():
+    def select_output_folder():
         folder = filedialog.askdirectory()
         if folder:
             output_folder.set(folder)
 
     def run():
         if not input_folder.get() or not csv_file.get() or not output_folder.get():
-            messagebox.showerror("Error", "Please complete all fields")
+            messagebox.showerror("Error", "Please select input folder, CSV file, and output folder.")
             return
-
+        
+        payer = selected_payer.get()
+        if not payer:
+            messagebox.showerror("Error", "Please select a payer.")
+            return
+        
         status_var.set("Processing...")
         progress.start()
+        run_button.config(state=tk.DISABLED)
 
         def task():
             try:
@@ -58,80 +75,144 @@ def main():
                     input_folder.get(),
                     csv_file.get(),
                     output_folder.get(),
+                    payer = payer,
                     log_callback=log_message
                 )
 
                 generate_csv_log(results)
 
-                status_var.set("Completed successfully ✔")
-                log_message("✔ Proceso completado")
-
-                messagebox.showinfo("Success", "Processing completed")
+                status_var.set("Completed Successfully")
+                log_message("Processing completed successfully.")
 
             except Exception as e:
-                status_var.set("Error occurred ❌")
-                log_message(f"ERROR: {str(e)}")
-                messagebox.showerror("Error", str(e))
-
+                status_var.set("Error during processing")
+                log_message(f"Error occurred: {str(e)}")
+                messagebox.showerror("Error", f"An error occurred during processing: {str(e)}")
             finally:
                 progress.stop()
+                run_button.config(state=tk.NORMAL)
+            
+        threading.Thread(target=task).start()
 
-        threading.Thread(target=task, daemon=True).start()
+    ### CSV LOG ###
 
-    # ---------- CSV LOG ----------
     def generate_csv_log(results):
-        now = datetime.now()
-        filename = f"asignaciones_{now.strftime('%Y-%m-%d_%H-%M-%S')}.csv"
-
+        now =datetime.now()
+        filename = f"asignaciones_{now.strftime('%Y-%m-%d_%H-%M')}.csv"
         filepath = f"{output_folder.get()}/{filename}"
 
-        with open(filepath, mode="w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=[
-                "archivo", "patient", "dos", "collector", "fecha"
-            ])
+        with open(filepath, mode= "w", newline='', encoding='utf-8-sig') as f:
+            writer = csv.DictWriter(f, fieldnames =[
+                "archivo", "patient", "dos", "collector", "fecha", "payer"
+            ], delimiter=';' if locale.localeconv()["decimal_point"] == ',' else ',', extrasaction= "ignore")
             writer.writeheader()
             writer.writerows(results)
+        log_message(f"CSV log generated: {filename}")
 
-        log_message(f"Log CSV generado: {filename}")
+    ### UI Layout ###
 
-    # ---------- UI ----------
     main_frame = ttk.Frame(root, padding=20)
-    main_frame.pack(fill="both", expand=True)
+    main_frame.pack(fill=tk.BOTH, expand=True)
+
+    #title
+    ttk.Label(
+        main_frame,
+        text="RPA Letter Mass Processor - Multi-Payer Support",
+        font=("Helvetica", 16, "bold")
+    ).pack(pady= (0, 20))
+
+    # Input/Output Controls
+    def build_row(label_text, var, command):
+        row =ttk.Frame(main_frame)
+        row.pack(fill= "x", pady=5)
+
+        ttk.Label(row, text = label_text, width=18).pack(side=tk.LEFT)
+        ttk.Entry(row, textvariable=var, width=40).pack(side="left", fill ="x", expand=True, padx=5)
+        ttk.Button(row, text="Browse", command=command, width=10).pack(side="left")
+
+    build_row("Input Folder:", input_folder, select_input_folder)
+    build_row("CSV File:", csv_file, select_csv_file)
+    build_row("Output Folder:", output_folder, select_output_folder)
+
+    # Payer Selection
+    ttk.Separator(main_frame, orient = "horizontal").pack(fill="x", pady=15)
 
     ttk.Label(
         main_frame,
-        text="RPA PDF Organizer",
-        font=("Segoe UI", 16, "bold")
-    ).pack(pady=(0, 10))
+        text = "Select Payer:",
+        font = ("Segoe UI", 12, "bold")
+    ).pack(anchor="w", pady= (10, 5))
 
-    def build_row(label_text, var, command):
-        row = ttk.Frame(main_frame)
-        row.pack(fill="x", pady=5)
+    # Frame for payer buttons
+    payer_frame = ttk.Frame(main_frame)
+    payer_frame.pack(fill="x", pady=10)
 
-        ttk.Label(row, text=label_text, width=15).pack(side="left")
-        ttk.Entry(row, textvariable=var).pack(side="left", fill="x", expand=True, padx=5)
-        ttk.Button(row, text="Browse", command=command).pack(side="left")
+    # Notebook style for payer selection
+    notebook = ttk.Notebook(payer_frame)
+    notebook.pack(fill="both", expand=True)
 
-    build_row("Input Folder:", input_folder, select_input)
-    build_row("CSV File:", csv_file, select_csv)
-    build_row("Output Folder:", output_folder, select_output)
+    # Create a tab for each payer
+    for payer in DEFAULT_PAYERS:
+        tab = ttk.Frame(notebook, padding = 15)
+        notebook.add(tab, text=payer)
 
-    ttk.Button(main_frame, text="Run Process", command=run).pack(pady=10)
+        ttk.Label(
+            tab,
+            text =f"Processing: {payer}",
+            font= ("Segoe UI", 11)
+        ).pack(pady=10)
 
-    progress = ttk.Progressbar(main_frame, mode='indeterminate')
-    progress.pack(fill="x", pady=5)
+        ttk.Label(
+            tab,
+            text =f"PDF's will be processed using {payer} specific Letter format.",
+            foreground="gray"
+        ).pack(pady=5)
 
+    # Update the selected payer when the tab is changed
+    def on_tab_change(event):
+        selected_idx = notebook.index(notebook.select())
+        selected_payer.set(DEFAULT_PAYERS[selected_idx])
+        log_message(f"Selected Payer: {selected_payer.get()}")
+
+    notebook.bind("<<NotebookTabChanged>>", on_tab_change)
+    selected_payer.set(DEFAULT_PAYERS[0])  # Set default payer
+
+    # Run button
+    ttk.Separator(main_frame, orient= "horizontal").pack(fill="x", pady=15)
+
+    button_frame = ttk.Frame(main_frame)
+    button_frame.pack(fill="x", pady=10)
+
+    run_button = ttk.Button(button_frame, text= "Start Processing", command=run, width=20, style="Accent.TButton")
+    run_button.pack(side="left", padx=5)
+
+    # Progress Bar
+    progress = ttk.Progressbar(button_frame, mode="indeterminate")
+    progress.pack(fill="x", padx=5)
+
+    # Status Label
     status_var = tk.StringVar(value="Ready")
-    ttk.Label(main_frame, textvariable=status_var).pack()
+    ttk.Label(main_frame, textvariable=status_var, foreground="gray").pack()
 
-    #LOG VISUAL
-    ttk.Label(main_frame, text="Log:").pack(anchor="w", pady=(10, 0))
+    # Log Section
+    ttk.Separator(main_frame, orient="horizontal").pack(fill="x", pady=10)
 
-    log_text = tk.Text(main_frame, height=10, bg="#1e1e1e", fg="#00ff00")
-    log_text.pack(fill="both", expand=True)
+    ttk.Label(
+        main_frame,
+        text = "Processing Log:",
+        font = ("Segoe UI", 10, "bold")
+    ).pack(anchor="w", pady=(10, 5))
+
+    log_text = tk.Text(main_frame, height=12, bg="#1e1e1e", fg="#00ff00", font=("Courier", 9))
+    log_text.pack(fill="both", expand=True, pady=(5, 0))
+
+    # Scrollbar for log
+    scrollbar = ttk.Scrollbar(log_text)
+    scrollbar.pack(side="right", fill="y")
+    log_text.config(yscrollcommand=scrollbar.set)
+    scrollbar.config(command=log_text.yview)
 
     root.mainloop()
-
 
 if __name__ == "__main__":
     main()

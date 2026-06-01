@@ -48,4 +48,4 @@ def pdf_to_image(pdf_path):
         poppler_path=os.path.normpath(poppler_path),
     )
 
-    return np.array(pages[0])
+    return [np.array(img) for img in images]
