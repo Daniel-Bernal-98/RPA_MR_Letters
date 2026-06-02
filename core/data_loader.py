@@ -27,36 +27,12 @@ def load_assignments(file_path):
     else:
         raise ValueError("Unsupported file format")
 
-    # DEBUG: columnas crudas
-    print("Columnas detectadas (raw):", df.columns.tolist())
-
-    # 🔥 Limpieza de nombres de columnas
-    df.columns = [
-        str(c)
-        .strip()
-        .lower()
-        .replace(" ", "_")
-        .replace("\ufeff", "")  # elimina BOM residual
-        for c in df.columns
-    ]
-
-    # DEBUG: columnas limpias
-    print("Columnas normalizadas:", df.columns.tolist())
-
-    # Validación de columnas
-    missing = [col for col in REQUIRED_COLUMNS if col not in df.columns]
-    if missing:
-        raise ValueError(f"Missing columns: {missing}")
-
     # Limpiar filas inválidas
     df = df.dropna(subset=REQUIRED_COLUMNS)
 
     # Normalizar contenido
     df["patient_name"] = df["patient_name"].apply(normalizar_texto)
     df["collector"] = df["collector"].apply(normalizar_texto)
-
-    # DEBUG: muestra primeras filas
-    print("Preview datos:", df.head().to_dict(orient="records"))
 
     return df.to_dict(orient="records")
 
@@ -67,8 +43,5 @@ def build_lookup(records):
     for r in records:
         key = r["patient_name"]
         lookup[key] = r["collector"]
-
-    # DEBUG: muestra lookup generado
-    print("Lookup generado:", lookup)
 
     return lookup

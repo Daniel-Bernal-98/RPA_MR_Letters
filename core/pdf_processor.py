@@ -46,10 +46,6 @@ def get_poppler_path():
 def pdf_to_image(pdf_path):
     poppler_path = get_poppler_path()
 
-    # Keep these prints if you need diagnostics; otherwise you can remove later
-    print("POPPLER PATH:", poppler_path)
-    print("EXISTS:", os.path.exists(poppler_path))
-
     if not os.path.exists(poppler_path):
         raise FileNotFoundError(f"Poppler not found at: {poppler_path}")
 

@@ -33,7 +33,6 @@ def find_best_match(patient, lookup_keys, threshold = 90):
     
     # Exact match first
     if patient in lookup_keys:
-        print(f"Exact Match: {patient}")
         return patient
     
     # Fuzzy falback
@@ -45,7 +44,6 @@ def find_best_match(patient, lookup_keys, threshold = 90):
 
     if match:
         name, score, _ = match
-        print(f"Comparing: {patient} --> {name} ({score})")
 
         if score >= threshold:
             return name
@@ -65,8 +63,6 @@ def find_best_match(patient, lookup_keys, threshold = 90):
 
 #     if match:
 #         name, score, _ = match
-
-#         print(f"Comparando: {patient} → {name} ({score})")
 
 #         if score >= threshold:
 #             return name
@@ -220,7 +216,6 @@ def process_single(file, input_folder, lookup, output_folder, payer='default'):
         }
 
     except Exception as e:
-        print(f"Error processing {file} with payer {payer}: {e}")
         return {
             "archivo": file,
             "patient": "ERROR",
@@ -248,12 +243,6 @@ def process_folder(input_folder, csv_path, output_folder, payer='default', log_c
     Returns:
         List of processing results
     """
-    print(f"\n{'='*70}")
-    print(f"Processing folder: {input_folder}")
-    print(f"Payer format: {payer}")
-    print(f"Old letter threshold: {OLD_DAYS_THRESHOLD} days")
-    print(f"{'='*70}\n")
-
     records = load_assignments(csv_path)
     lookup = build_lookup(records)
 
@@ -261,8 +250,6 @@ def process_folder(input_folder, csv_path, output_folder, payer='default', log_c
 
     if not files:
         raise ValueError(f"No PDF files found in {input_folder}")
-
-    print(f"Found {len(files)} PDF files to process\n")
 
     results = []
 

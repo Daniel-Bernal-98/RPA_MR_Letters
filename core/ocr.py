@@ -161,5 +161,4 @@ class OCRReader:
 
             return lines
         except Exception as e:
-            print(f"OCR Error: {e}")
             return []

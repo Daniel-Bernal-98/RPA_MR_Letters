@@ -57,8 +57,7 @@ def extract_text_fast(pdf_path):
         return results
     
     except Exception as e:
-        print(f"Fast Extraction Error: {e}")
-    
+        print(f"ERROR: {e}")
         return []
 
 
@@ -100,36 +99,29 @@ def extract_data_with_payer(pdf_path, payer='default'):
         used_fast = False
 
         for page_num, texto in text_pages:
-            
-            print(f"[{payer}] Scanning text page {page_num +1}")
-
             patient, dos = _extract_from_text(texto, payer)
 
             valid_patient = patient != "UNKNOWN"
             valid_dos = dos != "00-00-0000"
 
             if valid_patient and valid_dos:
-                print(f"[{payer}] Fast extraction success on page {page_num +1}")
                 used_fast = True
                 break
         
         if not used_fast:
-            print(f"[{payer}] Fast extraction incomplete, Using OCR")
-
             images = pdf_to_image(pdf_path)
-            print(f"[{payer}] Total pages converted to images: {len(images)}")
             payer_config = get_payer_ocr_config(payer)
 
             for page_num, img in enumerate(images):
-                print(f"[{payer}] OCR Scanning page {page_num + 1}")
-
                 data = ocr.read_with_boxes(img, payer_config=payer_config)
                 if payer == "BCBS TX":
-                    print(f"[{payer}] Using enhanced OCR zone extraction for {payer}")
                     ocr_patient, ocr_dos = _extract_from_ocr_data_bsbc_tx(data, img, payer)
                 elif payer == "Florida Blue":
-                    print(f"[{payer}] Using enhanced OCR zone extraction for {payer}")
                     ocr_patient, ocr_dos = _extract_from_ocr_data_florida_blue(data, img, payer)
+                elif payer == "Aetna":
+                    ocr_patient, ocr_dos = _extract_from_ocr_data_aetna(data, img, payer)
+                elif payer == "Cigna":
+                    ocr_patient, ocr_dos = _extract_from_ocr_data_cigna(data, img, payer)
                 else:
                     ocr_patient, ocr_dos = _extract_from_ocr_data(data, img, payer)
 
@@ -143,7 +135,6 @@ def extract_data_with_payer(pdf_path, payer='default'):
                     dos = ocr_dos
 
                 if patient != "UNKNOWN" and dos != "00-00-0000":
-                    print(f"[{payer}] OCR extraction success on page {page_num + 1}")
                     break
                     
         return patient, dos
@@ -295,7 +286,6 @@ def _extract_from_ocr_data_bsbc_tx(data, img, payer):
             if len(words) == 2:
                 # Format as LASTNAME_FIRSTNAME
                 patient = normalizar_nombre(f"{words[1]}_{words[0]}")
-                print(f"[{payer}] Found patient using BCBS TX logic: {patient}")
 
         #Look for DOS label (Service date for BCBS TX)
         if "SERVICE" in text:
@@ -320,7 +310,6 @@ def _extract_from_ocr_data_bsbc_tx(data, img, payer):
                     match = re.search(r"([0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{4})", w_item["text"])
                     if match:
                         dos = match.group(1).replace("/", "-")
-                        print(f"[{payer}] Found DOS using BCBS TX logic: {dos}")
                         break
     """
      BCBS TX DOS FALLBACK
@@ -349,7 +338,6 @@ def _extract_from_ocr_data_bsbc_tx(data, img, payer):
                     match = re.search(r"(\d{1,2}[/-]\d{1,2}[/-]\d{4})", text)
                     if match:
                         dos = match.group(1).replace("/", "-")
-                        print(f"[{payer}] Found DOS using BCBS TX fallback logic: {dos}")
                         break
 
                     # OCR Artifact: 4190025 -> 04/19/2025
@@ -375,21 +363,10 @@ def _extract_from_ocr_data_bsbc_tx(data, img, payer):
                                 f"{year}"
                             )
 
-                            print(f"[{payer}] Reconstructed DOS from OCR artifact: {dos}")
-
                             break
                         except Exception:
                             pass
 
-    for item in zone_data:
-        print(item["text"], item["top"], item["left"])
-
-    print("\n===== OCR RAW DATA =====")
-
-    for item in data:
-        print(item)
-
-    print("========================\n")
     return patient, dos
 
 def _extract_from_ocr_data_florida_blue(data, img, payer):
@@ -416,17 +393,6 @@ def _extract_from_ocr_data_florida_blue(data, img, payer):
     ]
     
     same_line_threshold = zone_config["same_line_threshold"]
-
-    print("\n===== FLORIDA BLUE OCR =====")
-
-    for item in zone_data:
-        print(
-            item["text"],
-            item["top"],
-            item["left"]
-        )
-
-    print("===========================\n")
 
     for i, item in enumerate(zone_data):
 
@@ -472,12 +438,240 @@ def _extract_from_ocr_data_florida_blue(data, img, payer):
                     dos = match.group(1).replace("/", "-")
                     break
     
-    # print("\n===== OCR RAW DATA =====")
+    return patient, dos
 
-    # for item in data:
-    #     print(item)
+def _extract_from_ocr_data_aetna(data, img, payer):
+    # Aetna specific OCR Extraction logic
 
-    # print("========================\n")
+    patient = "UNKNOWN"
+    dos = "00-00-0000"
+
+    h, w = img.shape[:2]
+
+    zone_config = get_payer_zone_config(payer)
+
+    patient_zone = zone_config["patient_search_zone"]
+
+    zone_left = int(w * patient_zone["left_percent"])
+    zone_right = int(w * patient_zone["right_percent"])
+    zone_top = int(h * patient_zone["top_percent"])
+    zone_bottom = int(h * patient_zone["bottom_percent"])
+
+    zone_data = [
+        d for d in data
+        if zone_left <= d["left"] <= zone_right
+        and zone_top <= d["top"] <= zone_bottom
+    ]
+
+    for i, item in enumerate(zone_data):
+        text = item["text"].upper().strip()
+
+        # Member Name Extraction Logic for Aetna:
+        if text == "MEMBER":
+            if(i+1 < len(zone_data) and zone_data[i+1]["text"].upper().startswith("NAME")):
+                patient_words = []
+
+                for j in range(i+2, min(i+8, len(zone_data))):
+                    candidate = zone_data[j]["text"].strip()
+                    upper = candidate.upper()
+
+                    if upper.startswith("MEMBER"):
+                        break
+                    if upper.startswith("ID"):
+                        break
+                    if upper.startswith("CASE"):
+                        break     
+                    
+                    clean = re.sub(r"[^A-Z]", "", upper)
+
+                    if len(clean) >= 2:
+                        patient_words.append(clean)
+
+                if len(patient_words) >= 2:
+                    first_name = patient_words[0]
+                    last_name = patient_words[-1]
+
+                    patient = normalizar_nombre(f"{last_name}_{first_name}")
+
+        # Date of Service Extraction Logic for Aetna
+        if "DATE" in text:
+
+            service_text = " ".join(
+                zone_data[j]["text"]
+                for j in range(i, min(i +12, len(zone_data)))
+            ).upper()
+
+            month_match = re.search(r"(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)\s+(\d{1,2}),\s+(\d{4})",
+                                     service_text
+                                    )
+            if month_match:
+
+                months = {
+                    "JANUARY": "01",
+                    "FEBRUARY": "02",
+                    "MARCH": "03",
+                    "APRIL": "04",
+                    "MAY": "05",
+                    "JUNE": "06",
+                    "JULY": "07",
+                    "AUGUST": "08",
+                    "SEPTEMBER": "09",
+                    "OCTOBER": "10",
+                    "NOVEMBER": "11",
+                    "DECEMBER": "12"
+                }
+
+                month = months[month_match.group(1)]
+                day = month_match.group(2).zfill(2)
+                year = month_match.group(3)
+
+                dos = f"{month}-{day}-{year}"
+
+    return patient, dos
+
+def _extract_from_ocr_data_cigna(data, img, payer):
+    """
+    Cigna specific OCR extraction.
+
+    Supports:
+        Format 1:
+            Patient:
+            Date of Service:
+        
+        Format 2:
+            Name:
+            Date of Service:
+    
+    The information may appear on different pages, and since there iare at least 2
+    different formats it is necesary to implement different extraction methods for
+    each format.
+    """
+    patient = "UNKNOWN"
+    dos = "00-00-0000"
+
+    h, w = img.shape[:2]
+
+    zone_config = get_payer_zone_config(payer)
+
+    patient_zone = zone_config["patient_search_zone"]
+
+    zone_left = int(w * patient_zone["left_percent"])
+    zone_right = int(w * patient_zone["right_percent"])
+    zone_top = int(h * patient_zone["top_percent"])
+    zone_bottom = int(h * patient_zone["bottom_percent"])
+
+    zone_data = [
+        d for d in data
+        if zone_left <= d["left"] <= zone_right
+        and zone_top <= d["top"] <= zone_bottom
+    ]
+
+    same_line_threshold = zone_config["same_line_threshold"]
+
+    # Patient Name Extraction
+
+    for i, item in enumerate(zone_data):
+        
+        text = item["text"].upper().strip()
+
+        # Format 1
+        # Patient
+        if text.startswith("PATIENT"):
+            
+            patient_words = []
+
+            for j in range(i+1, min(i+10, len(zone_data))):
+
+                candidate = zone_data[j]["text"].strip()
+                upper = candidate.upper()
+
+                if upper.startswith("RELATIONSHIP"):
+                    break
+                if upper.startswith("PROVIDER"):
+                    break
+                if upper.startswith("DATE"):
+                    break
+
+                clean = re.sub(r"[^A-Z]","", upper)
+
+                if len(clean) >= 2:
+                    patient_words.append(clean)
+
+            if len(patient_words) >= 2:
+
+                first_name = patient_words[0]
+                last_name = patient_words[1]
+
+                patient = normalizar_nombre(f"{last_name}_{first_name}")
+
+                break
+        
+        # Format 2
+        # Name:
+
+        elif text.startswith("NAME"):
+            patient_words = []
+
+            for j in range(i + 1, min(i + 6, len(zone_data))):
+
+                candidate = zone_data[j]["text"].strip()
+                upper = candidate.upper()
+
+                if upper.startswith("ID"):
+                    break
+                if upper.startswith("SR"):
+                    break
+                if upper.startswith("DATE"):
+                    break
+
+                clean = re.sub(r"[^A-Z]", "", upper)
+
+                if len(clean) >= 2:
+                    patient_words.append(clean)
+
+            if len(patient_words) >= 2:
+
+                first_name = patient_words[0]
+                last_name = patient_words[-1]
+
+                patient = normalizar_nombre(f"{last_name}_{first_name}")
+
+                break
+
+    # DOS Extraction
+
+    for i, item in enumerate(zone_data):
+
+        text = item["text"].upper().strip()
+
+        if "DATE" in text:
+            search_text = " ".join(
+                zone_data[j]["text"]
+                for j in range (i, min(i + 25, len(zone_data)))
+            ).upper()
+
+            # Format MM/DD/YYYY
+
+            match = re.search(r"(\d{1,2}/\d{1,2}/\d{4})", search_text)
+
+            if match:
+                dos = (match.group(1).replace("/","-"))
+                break
+
+            # For date ranges
+
+            range_match = re.search(r"(\d{1,2}/\d{1,2}/\d{4})\s*-\s*(\d{1,2}/\d{1,2}/\d{4})", search_text)
+
+            if range_match:
+                dos = (range_match.group(1).replace("/","-"))
+                break
+    print(f"Tesseract captured text: {text}")
+    print("\n====== CIGNA OCR ======")
+
+    for item in zone_data:
+        print(repr(item["text"]))
+
+    print("=========================\n")
     return patient, dos
 
 # Default OCR extraction logic for other payers
@@ -580,12 +774,7 @@ def _extract_from_ocr_data(data, img, payer):
                 if match:
                     dos = match.group(1).replace("/", "-")
                     break
-    print("\n===== OCR RAW DATA =====")
 
-    for item in data:
-        print(item)
-
-    print("========================\n")
     return patient, dos
 
 
@@ -653,7 +842,6 @@ def extract_issue_date(pdf_path, payer='default'):
             d = _parse_issue_date_from_text(texto.upper())
 
             if d:
-                print(f"Issue date found on page {page_num +1}")
                 return d
 
         # OCR fallback
@@ -667,7 +855,6 @@ def extract_issue_date(pdf_path, payer='default'):
         date_zone = zone_config["date_search_zone"]
 
         for page_num, img in enumerate(images):
-            print(f"Issue date OCR Scanning page {page_num + 1}")
             data = ocr.read_with_boxes(img, payer_config=payer_config)
 
             h, w = img.shape[:2]
@@ -690,5 +877,4 @@ def extract_issue_date(pdf_path, payer='default'):
             return _parse_issue_date_from_text(joined)
 
     except Exception as e:
-        print(f"ERROR extracting issue date: {e}")
         return None
