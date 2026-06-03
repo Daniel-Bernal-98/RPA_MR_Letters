@@ -1,5 +1,5 @@
 # ============================================================================
-# MR Letters Generator
+# Automatic Letter Reader for workload Assignations
 #
 # Copyright (c) 2026 ABA Centers of America
 # All Rights Reserved.

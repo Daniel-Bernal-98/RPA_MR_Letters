@@ -1,8 +1,8 @@
-# MR Letters Generator
+# Automatic Letter Reader for workload Assignations
 
 ## Overview
 
-MR Letters Generator is a Windows desktop application designed to automate the processing and assignment of Medical Records (MR) request letters received from multiple insurance payers.
+Automatic Letter Reader for workload Assignations is a Windows desktop application designed to automate the processing and assignment of Medical Records (MR) request letters received from multiple insurance payers.
 
 The application:
 
@@ -19,6 +19,23 @@ The system supports both direct PDF text extraction and OCR fallback for scanned
 ---
 
 # Key Features
+
+## Automatic Payer Detection
+
+The application can automatically detect the payer from PDF content without requiring manual selection.
+
+Supported payers:
+
+* Florida Blue
+* Aetna
+* Cigna
+* BCBS TX (Blue Cross Blue Shield of Texas)
+* Optum / United Healthcare / UHC
+* UMR
+
+Falls back to default extraction rules if payer cannot be determined.
+
+---
 
 ## Multi-Payer Support
 
@@ -158,6 +175,7 @@ RPA_MR_Letters/
 │   ├── file_manager.py
 │   ├── ocr.py
 │   ├── payer_config.py
+│   ├── payer_detector.py
 │   ├── pdf_processor.py
 │   └── processor.py
 │
@@ -443,7 +461,6 @@ core/payer_config.py
 
 Potential future improvements:
 
-* Automatic payer detection
 * OCR confidence scoring
 * Visual zone editor
 * Batch profile management

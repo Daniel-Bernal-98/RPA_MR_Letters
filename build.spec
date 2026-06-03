@@ -1,6 +1,5 @@
-# PyInstaller spec for MR Letters Generator
+# PyInstaller spec for Automatic Letter Reader for workload Assignations
 # Usage: pyinstaller build.spec
-# Output: dist/MR_Letters_Generator/
 
 from pathlib import Path
 
@@ -9,19 +8,16 @@ block_cipher = None
 
 def collect_assets():
     """
-    Bundle everything under ./assets into the app under an 'assets/' folder.
-
-    Returns a list of (src, dest_relative_to_app) tuples.
+    Bundle everything under ./assets into the application.
     """
     datas = []
     assets_root = Path("assets")
+
     if not assets_root.exists():
         return datas
 
     for p in assets_root.rglob("*"):
         if p.is_file():
-            # destination folder inside the bundle:
-            # e.g. assets/poppler/Library/bin
             rel_parent = p.parent.relative_to(assets_root)
             dest = str(Path("assets") / rel_parent)
             datas.append((str(p), dest))
@@ -35,26 +31,34 @@ a = Analysis(
     binaries=[],
     datas=collect_assets(),
     hiddenimports=[
+        # Core
         "pandas",
         "openpyxl",
         "docx",
         "PIL",
+
+        # GUI
         "tkinter",
         "tkinter.filedialog",
         "tkinter.messagebox",
         "tkinter.ttk",
         "tkinter.scrolledtext",
+
+        # PDF Processing
+        "pdf2image",
+
+        # OCR
+        "cv2",
+        "numpy",
+        "pytesseract",
+
+        # Matching
+        "rapidfuzz",
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[
-        # Exclude heavy ML libraries from the UI-only build to keep it smaller.
-        # Remove these lines if OCR / EasyOCR is needed in the distributed build.
-        "torch",
-        "torchvision",
-        "easyocr",
-    ],
+    excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -69,11 +73,12 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name="MR_Letters_Generator",
+    icon="assets/icon.ico",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

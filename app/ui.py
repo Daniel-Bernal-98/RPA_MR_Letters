@@ -1,5 +1,5 @@
 # ============================================================================
-# MR Letters Generator
+# Automatic Letter Reader for workload Assignations
 #
 # Copyright (c) 2026 ABA Centers of America
 # All Rights Reserved.
@@ -19,22 +19,38 @@ import csv
 from datetime import datetime
 from core.processor import process_folder
 import locale
+import os
+import sys
 
 #default list of payers, can be extended if needed
-DEFAULT_PAYERS = ["UMR","Optum", "Aetna", "Cigna", "BCBS TX", "Florida Blue"]
+DEFAULT_PAYERS = ["UMR","Optum", "Aetna", "Cigna", "BCBS TX", "Florida Blue", "Auto"]
+
+def  resourse_path(relative_path):
+    """
+    For PyInstaller build, return the correct path.
+    """
+
+    try:
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(".")
+    
+    return os.path.join(base_path, relative_path)
 
 def main():
     root =tk.Tk()
+    root.iconbitmap(resourse_path("assets/icon.ico"))#Custom Icon
     root.title("RPA Letter Mass Processor - Multi-Payer Support")
     root.geometry("850x700")
-    root.resizable(True, True)
+    root.resizable(True, True)   
     
     style = ttk.Style()
     try:
-        root.tk.call("source", "forest-dark.tcl")
+        root.tk.call("source", resourse_path("assets/forest-dark.tcl"))
         style.theme_use("forest-dark")
-    except:
-        pass
+    except Exception as e:
+        print(f"Theme loading error: {e}")
+        
 
     input_folder = tk.StringVar()
     csv_file = tk.StringVar()
@@ -176,6 +192,16 @@ def main():
         tab = ttk.Frame(notebook, padding = 15)
         notebook.add(tab, text=payer)
 
+        if payer == "Auto":
+            description = (
+                "Letters will be analyzed automatically."
+                "This mode supports mixed payers but may be less accurate"
+            )
+        else:
+            description = (
+                f"PDF's will be processed using {payer} specific letter format."
+            )
+
         ttk.Label(
             tab,
             text =f"Processing: {payer}",
@@ -184,8 +210,8 @@ def main():
 
         ttk.Label(
             tab,
-            text =f"PDF's will be processed using {payer} specific Letter format.",
-            foreground="gray"
+            text = description,
+            foreground="white"
         ).pack(pady=5)
 
     # Update the selected payer when the tab is changed
@@ -193,6 +219,12 @@ def main():
         selected_idx = notebook.index(notebook.select())
         selected_payer.set(DEFAULT_PAYERS[selected_idx])
         log_message(f"Selected Payer: {selected_payer.get()}")
+        
+        payer = selected_payer.get()
+
+        if payer == "Auto":
+            log_message("WARNING: Automatic mode is experimental")
+            log_message("and may produce assignment or extraction errors than payer-specific processing")
 
     notebook.bind("<<NotebookTabChanged>>", on_tab_change)
     selected_payer.set(DEFAULT_PAYERS[0])  # Set default payer

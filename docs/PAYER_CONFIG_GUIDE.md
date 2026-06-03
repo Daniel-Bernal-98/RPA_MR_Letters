@@ -2,7 +2,7 @@
 
 # Payer Configuration Guide
 
-This document explains how payer-specific configurations work inside the MR Letters Generator project and how to add, tune, and troubleshoot new payer configurations.
+This document explains how payer-specific configurations work inside the Automatic Letter Reader for workload Assignations project and how to add, tune, and troubleshoot new payer configurations.
 
 ---
 
@@ -605,7 +605,7 @@ Potential future enhancements:
 
 # Summary
 
-The payer configuration system allows the MR Letters Generator to adapt to multiple document formats without changing the extraction engine.
+The payer configuration system allows the Automatic Letter Reader for workload Assignations to adapt to multiple document formats without changing the extraction engine.
 
 Most new payer integrations only require:
 

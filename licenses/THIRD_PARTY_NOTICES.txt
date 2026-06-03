@@ -1,0 +1,11 @@
+Forest ttk Theme
+
+Source:
+https://github.com/rdbende/Forest-ttk-theme
+
+License:
+MIT License
+
+Copyright (c) Original Author
+
+Used as part of the MR Letters Automation application.

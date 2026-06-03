@@ -2,7 +2,7 @@
 
 Copyright (c) 2026 ABA Centers of America. All Rights Reserved.
 
-MR Letters Generator is proprietary software developed for the exclusive internal use of ABA Centers of America.
+Automatic Letter Reader for workload Assignations is proprietary software developed for the exclusive internal use of ABA Centers of America.
 
 Permission is granted only to authorized employees, contractors, and representatives of ABA Centers of America to use this software solely for business purposes within the organization.
 

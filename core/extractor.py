@@ -1,5 +1,5 @@
 # ============================================================================
-# MR Letters Generator
+# Automatic Letter Reader for workload Assignations
 #
 # Copyright (c) 2026 ABA Centers of America
 # All Rights Reserved.
@@ -13,9 +13,8 @@
 
 import re
 import cv2
-import numpy as np
 
-from datetime import datetime, date
+from datetime import datetime
 from core.pdf_processor import pdf_to_image
 from core.ocr import OCRReader
 from core.payer_config import (
@@ -57,7 +56,6 @@ def extract_text_fast(pdf_path):
         return results
     
     except Exception as e:
-        print(f"ERROR: {e}")
         return []
 
 
@@ -140,7 +138,6 @@ def extract_data_with_payer(pdf_path, payer='default'):
         return patient, dos
 
     except Exception as e:
-        print(f"[{payer}] ERROR: {e}")
         patient, dos = "ERROR", "00-00-0000"
         return patient, dos
 
@@ -665,13 +662,7 @@ def _extract_from_ocr_data_cigna(data, img, payer):
             if range_match:
                 dos = (range_match.group(1).replace("/","-"))
                 break
-    print(f"Tesseract captured text: {text}")
-    print("\n====== CIGNA OCR ======")
-
-    for item in zone_data:
-        print(repr(item["text"]))
-
-    print("=========================\n")
+    
     return patient, dos
 
 # Default OCR extraction logic for other payers

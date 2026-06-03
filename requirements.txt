@@ -6,16 +6,9 @@ pypdf2>=3.0.0
 pytesseract>=0.3.0
 opencv-python-headless>=4.5.0
 pdf2image>=1.16.0
-pypdf2>=3.0.0
-fuzz >=0.1.0
 rapidfuzz>=1.0.0
 pyinstaller>=5.0.0
 
-# OCR pipeline (kept for PDF classification / legacy use)
-easyocr>=1.7.0
+# GUI
 numpy>=1.24.0
-pdf2image>=1.16.0
 Pillow>=10.0.0
-torch>=2.0.0
-torchvision>=0.15.0
-ttkbootstrap

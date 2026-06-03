@@ -1,5 +1,5 @@
 # ============================================================================
-# MR Letters Generator
+# Automatic Letter Reader for workload Assignations
 #
 # Copyright (c) 2026 ABA Centers of America
 # All Rights Reserved.
@@ -18,6 +18,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from rapidfuzz import process, fuzz
 
 from core.extractor import extract_data_with_payer, extract_issue_date
+from core.payer_detector import detect_payer
 from core.file_manager import save_file
 from core.data_loader import load_assignments, build_lookup
 
@@ -50,24 +51,6 @@ def find_best_match(patient, lookup_keys, threshold = 90):
         
     return None
 
-# def find_best_match(patient, lookup_keys, threshold=90):
-#     """Find best matching patient name in lookup dictionary using fuzzy matching."""
-#     if patient == "UNKNOWN":
-#         return None
-
-#     match = process.extractOne(
-#         patient,
-#         lookup_keys,
-#         scorer=fuzz.ratio
-#     )
-
-#     if match:
-#         name, score, _ = match
-
-#         if score >= threshold:
-#             return name
-
-#     return None
 
 def normalize_variants(patient):
     """
@@ -109,19 +92,6 @@ def normalize_variants(patient):
         variants.add(f"{last}_{first}")
     return list(variants)
 
-# def normalize_variants(patient):
-#     """Generate name variants for fuzzy matching (e.g., FIRST_LAST and LAST_FIRST)."""
-#     parts = patient.split("_")
-
-#     if len(parts) == 2:
-#         return [
-#             patient,
-#             f"{parts[1]}_{parts[0]}"
-#         ]
-
-#     return [patient]
-
-
 def process_single(file, input_folder, lookup, output_folder, payer='default'):
     """
     Process a single PDF file with payer-specific extraction and old letter detection.
@@ -139,11 +109,21 @@ def process_single(file, input_folder, lookup, output_folder, payer='default'):
     try:
         path = os.path.join(input_folder, file)
 
-        # Extract patient and DOS using payer-specific config
-        patient, dos = extract_data_with_payer(path, payer=payer)
+        actual_payer = payer
+
+        if payer == "Auto":
+
+            detected = detect_payer(path)
+
+            if detected:
+                actual_payer = detected
+            else:
+                actual_payer= "default"
+            # Extract patient and DOS using payer-specific config
+        patient, dos = extract_data_with_payer(path, payer=actual_payer)
 
         # Extract issue date for old letter detection
-        issue_date = extract_issue_date(path, payer=payer)
+        issue_date = extract_issue_date(path, payer=actual_payer)
 
         # Check if letter is older than threshold
         is_old = False
@@ -175,7 +155,7 @@ def process_single(file, input_folder, lookup, output_folder, payer='default'):
                 "patient": patient,
                 "dos": dos,
                 "collector": collector,
-                "payer": payer,
+                "payer": actual_payer,
                 "fecha": now,
                 "issue_date": issue_date.strftime("%Y-%m-%d") if issue_date else None,
                 "is_old": True,
@@ -209,7 +189,7 @@ def process_single(file, input_folder, lookup, output_folder, payer='default'):
             "patient": final_patient,
             "dos": dos,
             "collector": collector,
-            "payer": payer,
+            "payer": actual_payer,
             "fecha": now,
             "issue_date": issue_date.strftime("%Y-%m-%d") if issue_date else None,
             "is_old": False,
@@ -221,7 +201,7 @@ def process_single(file, input_folder, lookup, output_folder, payer='default'):
             "patient": "ERROR",
             "dos": "00-00-0000",
             "collector": "ERROR",
-            "payer": payer,
+            "payer": actual_payer,
             "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "issue_date": None,
             "is_old": False,
@@ -266,7 +246,7 @@ def process_folder(input_folder, csv_path, output_folder, payer='default', log_c
             results.append(result)
 
             if log_callback:
-                is_old_marker = "🕐 OLD" if result.get("is_old") else ""
+                is_old_marker = "OLD" if result.get("is_old") else ""
                 status = "✔" if result['collector'] != "ERROR" else "❌"
                 log_callback(
                     f"{status} {result['archivo']} → {result['patient']} ({result['collector']}) {is_old_marker}"
