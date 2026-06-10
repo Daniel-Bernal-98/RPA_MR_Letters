@@ -21,6 +21,7 @@ from core.processor import process_folder
 import locale
 import os
 import sys
+import time
 
 #default list of payers, can be extended if needed
 DEFAULT_PAYERS = ["UMR","Optum", "Aetna", "Cigna", "BCBS TX", "Florida Blue", "Auto"]
@@ -84,6 +85,19 @@ def main():
         if folder:
             output_folder.set(folder)
 
+    def update_progress(processed, total):
+        percent = (processed / total * 100 if total > 0 else 0)
+
+        progress["value"] = percent
+
+        progress_var.set(f"{processed} / {total}")
+
+        if processed > 0:
+            elapsed = time.time() - start_time
+
+    def update_current_file(filename):
+        root.after(0, lambda f=filename: current_file_var.set(f"Current File: {f}"))
+
     def run():
         if not input_folder.get() or not csv_file.get() or not output_folder.get():
             messagebox.showerror("Error", "Please select input folder, CSV file, and output folder.")
@@ -94,23 +108,29 @@ def main():
             messagebox.showerror("Error", "Please select a payer.")
             return
         
+        start_time = time.time()
+
         status_var.set("Processing...")
         progress.start()
         run_button.config(state=tk.DISABLED)
 
         def task():
             try:
+
                 results = process_folder(
                     input_folder.get(),
                     csv_file.get(),
                     output_folder.get(),
                     payer = payer,
-                    log_callback=log_message
+                    log_callback=log_message,
+                    progress_callback=update_progress,
+                    current_file_callback=update_current_file
                 )
 
                 generate_csv_log(results)
 
                 status_var.set("Completed Successfully")
+            
                 log_message("Processing completed successfully.")
 
                 messagebox.showinfo(
@@ -121,12 +141,18 @@ def main():
                 )
 
             except Exception as e:
+                import traceback #Temporary
                 status_var.set("Error during processing")
-                log_message(f"Error occurred: {str(e)}")
-                root.after(0, lambda: messagebox.showerror("Error", f"An error occurred during processing:\n\n {str(e)}"))
+                # log_message(f"Error occurred: {str(e)}")
+                traceback.print_exc() # Temporary
+                error_msg = traceback.format_exc() # Temporary
+                print(error_msg) # Temporary
+                log_message(error_msg)
+                root.after(0, lambda msg = error_msg: messagebox.showerror("Error", msg))
             finally:
                 progress.stop()
                 run_button.config(state=tk.NORMAL)
+                progress["value"] = 100
             
         threading.Thread(target=task).start()
 
@@ -239,12 +265,18 @@ def main():
     run_button.pack(side="left", padx=5)
 
     # Progress Bar
-    progress = ttk.Progressbar(button_frame, mode="indeterminate")
+    progress = ttk.Progressbar(button_frame, mode="determinate", maximum=100)
     progress.pack(fill="x", padx=5)
 
     # Status Label
     status_var = tk.StringVar(value="Ready")
+    progress_var = tk.StringVar(value ="Processed 0 / 0")
+    eta_var = tk.StringVar(value="Time Remaining: Calculating...")
     ttk.Label(main_frame, textvariable=status_var, foreground="gray").pack()
+    ttk.Label(main_frame, textvariable=progress_var).pack()
+    ttk.Label(main_frame, textvariable=eta_var).pack()
+    current_file_var = tk.StringVar(value="Current File: None")
+    ttk.Label(main_frame, textvariable=current_file_var).pack()
 
     # Log Section
     ttk.Separator(main_frame, orient="horizontal").pack(fill="x", pady=10)

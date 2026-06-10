@@ -110,17 +110,27 @@ def process_single(file, input_folder, lookup, output_folder, payer='default'):
         path = os.path.join(input_folder, file)
 
         actual_payer = payer
+        was_unknown = False
+        detected = None
 
         if payer == "Auto":
+            # Extract patient and DOS using payer-specific config
 
             detected = detect_payer(path)
 
             if detected:
+                print(f"[AUTO] {file} -> Detected payer: {detected}")
                 actual_payer = detected
             else:
-                actual_payer= "default"
-            # Extract patient and DOS using payer-specific config
+                print(f"[AUTO] {file} -> Unknown Payer.")
+                actual_payer = "default"
+                was_unknown = True
+
         patient, dos = extract_data_with_payer(path, payer=actual_payer)
+        """        
+        print(
+            f"[AUTO] Extraction -> Payer: {actual_payer}, Patient: {patient}, DOS: {dos}"
+        )"""
 
         # Extract issue date for old letter detection
         issue_date = extract_issue_date(path, payer=actual_payer)
@@ -159,6 +169,7 @@ def process_single(file, input_folder, lookup, output_folder, payer='default'):
                 "fecha": now,
                 "issue_date": issue_date.strftime("%Y-%m-%d") if issue_date else None,
                 "is_old": True,
+                "is_unknown": was_unknown,
             }
 
         # Normal processing for recent letters
@@ -193,6 +204,7 @@ def process_single(file, input_folder, lookup, output_folder, payer='default'):
             "fecha": now,
             "issue_date": issue_date.strftime("%Y-%m-%d") if issue_date else None,
             "is_old": False,
+            "is_unknown": was_unknown
         }
 
     except Exception as e:
@@ -205,11 +217,18 @@ def process_single(file, input_folder, lookup, output_folder, payer='default'):
             "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "issue_date": None,
             "is_old": False,
+            "is_unknown": was_unknown,
             "error": str(e)
         }
 
 
-def process_folder(input_folder, csv_path, output_folder, payer='default', log_callback=None):
+def process_folder(input_folder,
+                   csv_path,
+                   output_folder, payer='default',
+                   log_callback=None,
+                   progress_callback = None,
+                   current_file_callback = None
+                   ):
     """
     Process all PDFs in a folder with payer-specific extraction and old letter detection.
     
@@ -230,6 +249,16 @@ def process_folder(input_folder, csv_path, output_folder, payer='default', log_c
 
     if not files:
         raise ValueError(f"No PDF files found in {input_folder}")
+    
+    stats = {
+        "UMR": 0,
+        "Optum": 0,
+        "BCBS TX": 0,
+        "Florida Blue" : 0,
+        "Aetna": 0,
+        "Cigna": 0,
+        "Unknown": 0,
+    }
 
     results = []
 
@@ -243,13 +272,53 @@ def process_folder(input_folder, csv_path, output_folder, payer='default', log_c
 
         for future in as_completed(futures):
             result = future.result()
+            
+            if current_file_callback:
+                current_file_callback(result["archivo"])
+                
             results.append(result)
+
+            if progress_callback:
+                progress_callback(len(results), len(files))
+
+            if result.get("is_unknown"):
+                stats["Unknown"] += 1
+            else:
+                payer_name = result.get("payer")
+                if payer_name in stats:
+                    stats[payer_name] += 1
 
             if log_callback:
                 is_old_marker = "OLD" if result.get("is_old") else ""
-                status = "✔" if result['collector'] != "ERROR" else "❌"
+                status = "✔" if result['collector'] != "ERROR" else "[ERROR]"
                 log_callback(
                     f"{status} {result['archivo']} → {result['patient']} ({result['collector']}) {is_old_marker}"
                 )
+
+    total = sum(stats.values())
+
+    unknown_pct = (
+        (stats["Unknown"]/ total) * 100
+        if total > 0
+        else 0
+    )
+
+    log_callback(
+        "\n==============================\n"
+        "\nAUTO PROCESSING SUMMARY\n"
+        "\n==============================\n"
+    )
+
+    for payer_name, count in stats.items():
+        log_callback(f"{payer_name}: {count}")
+
+    errors = len([r for r in results if r["collector"]=="ERROR"])
+
+    log_callback(
+        f"\n Total: {total}\n"
+        f"Errors: {errors}\n"
+        f"Unknown Rate: {unknown_pct:.1f}%\n"
+        "================================\n"
+    )
 
     return results
