@@ -26,7 +26,7 @@ import time
 #default list of payers, can be extended if needed
 DEFAULT_PAYERS = ["UMR","Optum", "Aetna", "Cigna", "BCBS TX", "Florida Blue", "Auto"]
 
-def  resourse_path(relative_path):
+def resource_path(relative_path):
     """
     For PyInstaller build, return the correct path.
     """
@@ -40,14 +40,14 @@ def  resourse_path(relative_path):
 
 def main():
     root =tk.Tk()
-    root.iconbitmap(resourse_path("assets/icon.ico"))#Custom Icon
+    root.iconbitmap(resource_path("assets/icon.ico"))#Custom Icon
     root.title("RPA Letter Mass Processor - Multi-Payer Support")
     root.geometry("850x700")
     root.resizable(True, True)   
     
     style = ttk.Style()
     try:
-        root.tk.call("source", resourse_path("assets/forest-dark.tcl"))
+        root.tk.call("source", resource_path("assets/forest-dark.tcl"))# Forest dark theme call
         style.theme_use("forest-dark")
     except Exception as e:
         print(f"Theme loading error: {e}")
@@ -57,14 +57,19 @@ def main():
     csv_file = tk.StringVar()
     output_folder = tk.StringVar()
     selected_payer = tk.StringVar(value=DEFAULT_PAYERS[0])
+    start_time = None
 
     # ----------------- UI Build -----------------
     
     ### LOG UI ###
 
     def log_message(msg):
-        log_text.insert(tk.END, msg + "\n")
-        log_text.see(tk.END)
+        root.after(
+            0,lambda: (
+                log_text.insert(tk.END, msg + "\n"),
+                log_text.see(tk.END)
+            )
+        )
 
     ### FUNCTIONS ###
 
@@ -86,19 +91,26 @@ def main():
             output_folder.set(folder)
 
     def update_progress(processed, total):
-        percent = (processed / total * 100 if total > 0 else 0)
+        def _update():
+            percent = (processed / total *100 if total > 0  else 0)
+            progress["value"] = percent
+            progress_var.set(f"{processed} / {total}")
 
-        progress["value"] = percent
+            if processed >0 and start_time:
+                elapsed = time.time() - start_time
+                avg_time = elapsed / processed
+                remaining = total - processed
+                eta_seconds = int(avg_time * remaining)
+                mins, secs = divmod(eta_seconds, 60)
+                eta_var.set(f"Time remaining: {mins:02d}:{secs:02d}")
 
-        progress_var.set(f"{processed} / {total}")
-
-        if processed > 0:
-            elapsed = time.time() - start_time
+        root.after(0, _update)
 
     def update_current_file(filename):
         root.after(0, lambda f=filename: current_file_var.set(f"Current File: {f}"))
 
     def run():
+        nonlocal start_time
         if not input_folder.get() or not csv_file.get() or not output_folder.get():
             messagebox.showerror("Error", "Please select input folder, CSV file, and output folder.")
             return
@@ -111,7 +123,7 @@ def main():
         start_time = time.time()
 
         status_var.set("Processing...")
-        progress.start()
+
         run_button.config(state=tk.DISABLED)
 
         def task():
@@ -129,32 +141,33 @@ def main():
 
                 generate_csv_log(results)
 
-                status_var.set("Completed Successfully")
+                root.after(0, lambda: status_var.set("Completed Successfully"))
             
                 log_message("Processing completed successfully.")
 
-                messagebox.showinfo(
-                    "Process Completed",
-                    f"Processing completed successfully for payer: {payer}.\n\n"
-                    f"CSV log has been generated in the output folder.\n\n"
-                    f"Processed files: {len(results)}\n"
+                root.after(
+                    0, lambda: messagebox.showinfo(
+                        "Process Completed",
+                        f"Processing completed successfully for payer: {payer}.\n\n"
+                        f"CSV Log has been generated in the output folder. \n\n"
+                        f"Processed files: {len(results)}\n"
+                    )
                 )
-
+                
             except Exception as e:
                 import traceback #Temporary
-                status_var.set("Error during processing")
-                # log_message(f"Error occurred: {str(e)}")
+                root.after(0, lambda: status_var.set("Error During processing"))
                 traceback.print_exc() # Temporary
                 error_msg = traceback.format_exc() # Temporary
                 print(error_msg) # Temporary
                 log_message(error_msg)
                 root.after(0, lambda msg = error_msg: messagebox.showerror("Error", msg))
             finally:
-                progress.stop()
-                run_button.config(state=tk.NORMAL)
-                progress["value"] = 100
+
+                root.after(0, lambda:run_button.config(state=tk.NORMAL))
+                root.after(0, lambda: progress.configure(value = 100))
             
-        threading.Thread(target=task).start()
+        threading.Thread(target=task, daemon= True).start()
 
     ### CSV LOG ###
 
