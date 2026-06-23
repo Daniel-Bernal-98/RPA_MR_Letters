@@ -1,28 +1,22 @@
 import tkinter as tk
 from tkinter import ttk
 
-from app.mr_ui import main as mr_main, resource_path
+from app.mr_ui import main as mr_main
+from app.utils import resource_path, close_application
 from app.correspondence_ui import main as correspondence_main
+from app.theme import set_theme
 
 root = tk.Tk()
-
-def set_theme(root):
-    style = ttk.Style()
-    try:
-        root.tk.call("source", resource_path("assets/forest-dark.tcl"))# Forest dark theme call
-        style.theme_use("forest-dark")
-    except Exception as e:
-        print(f"Theme loading error: {e}")
 
 def open_mr_ui():
     set_theme(root)
     root.withdraw()
-    mr_main()
+    mr_main(root)
 
 def open_correspondence_ui():
     set_theme(root)
     root.withdraw()
-    correspondence_main()
+    correspondence_main(root)
 
 def main():
     set_theme(root)
@@ -44,16 +38,21 @@ def main():
     ttk.Button(
         root,
         text= "Medical Records Letters",
-        command=lambda: open_mr_ui(root),
+        command=lambda: open_mr_ui(),
         width=30
     ).pack(pady=20)
 
     ttk.Button(
         root,
         text= "Correspondence Team",
-        command=lambda: open_correspondence_ui(root),
+        command=lambda: open_correspondence_ui(),
         width=30
     ).pack(pady=20)
+
+    root.protocol(
+        "WM_DELETE_WINDOW",
+        lambda: close_application(root)
+    )
 
     root.mainloop()
 

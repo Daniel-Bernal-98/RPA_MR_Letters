@@ -14,45 +14,35 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter import ttk
+from app.theme import set_theme
 import threading
 import csv
 from datetime import datetime
 from core.processor import process_folder
 import locale
-import os
-import sys
+from app.utils import resource_path, close_application
 import time
 
 #default list of payers, can be extended if needed
 DEFAULT_PAYERS = ["UMR","Optum", "Aetna", "Cigna", "BCBS TX", "Florida Blue", "Auto"]
 
-def resource_path(relative_path):
-    """
-    For PyInstaller build, return the correct path.
-    """
+def main(launcher_root = None):
 
-    try:
-        base_path = sys._MEIPASS
-    except AttributeError:
-        base_path = os.path.abspath(".")
-    
-    return os.path.join(base_path, relative_path)
+    def back_to_launcher():
+        if launcher_root:
+            launcher_root.deiconify()
+        root.destroy()
 
-def main():
-    root =tk.Tk()
+    root =tk.Toplevel()
+
+    #set_theme(root)
+
     root.iconbitmap(resource_path("assets/icon.ico"))#Custom Icon
-    root.title("RPA Letter Mass Processor - Multi-Payer Support")
+    root.title("RPA Letter Mass Processor - Multi-Payer Support v1.0.0")
+    ttk.Button(root, text="Back", command=back_to_launcher).pack(anchor="w", padx=10, pady=5)
     root.geometry("850x700")
     root.resizable(True, True)   
     
-    style = ttk.Style()
-    try:
-        root.tk.call("source", resource_path("assets/forest-dark.tcl"))# Forest dark theme call
-        style.theme_use("forest-dark")
-    except Exception as e:
-        print(f"Theme loading error: {e}")
-        
-
     input_folder = tk.StringVar()
     csv_file = tk.StringVar()
     output_folder = tk.StringVar()
@@ -309,7 +299,12 @@ def main():
     log_text.config(yscrollcommand=scrollbar.set)
     scrollbar.config(command=log_text.yview)
 
-    root.mainloop()
+    root.protocol(
+        "WM_DELETE_WINDOW",
+        lambda: close_application(root, launcher_root)
+    )
+
+    #root.mainloop()
 
 if __name__ == "__main__":
     main()

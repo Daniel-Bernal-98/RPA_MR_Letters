@@ -19,6 +19,16 @@ PDF
 
 ---
 
+## Scope Notice
+
+This document applies exclusively to the Medical Records Letters module and its Automatic Processing Mode.
+
+The configuration, workflows, payer detection rules, and processing logic described in this document are not used by the Correspondence Processing Module.
+
+The Correspondence Processing Module maintains its own extraction logic, payer signature configuration, classification engine, and processing workflow, which are documented separately in the Correspondence module documentation.
+
+---
+
 ## Detection Method
 
 Each payer has a list of signatures.

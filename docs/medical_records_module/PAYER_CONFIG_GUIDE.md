@@ -28,6 +28,16 @@ The system is designed so that new payers can be added without changing the extr
 
 ---
 
+## Scope Notice
+
+This document applies exclusively to the Medical Records Letters module and its Automatic Processing Mode.
+
+The payer configurations, OCR zones, extraction parameters, and processing rules described in this guide are used only by the MR Letters workflow.
+
+The Correspondence Processing Module uses a separate architecture based on payer signatures, generic extraction logic, document classification, and correspondence-specific business rules, which are documented independently.
+
+---
+
 # Configuration Architecture
 
 The configuration module is divided into 3 major sections:

@@ -20,13 +20,20 @@ Characteristics:
 - Poppler included
 - Tesseract included
 
+This deployment package includes:
+
+- Medical Records Letters Module
+- Correspondence Processing Module
+
+Both module share the same OCR engine, runtime assets and application interface.
+
 ---
 
 ## Build Requirements
 
 Development Environment:
 
-- Python 3.11+
+- Python 3.14
 - Windows 10/11
 - Virtual Environment (.venv)
 
@@ -71,49 +78,32 @@ dist/
 
 ## Pre-Release Validation
 
-Validate:
-
-- UMR
-- Optum
-- BCBS TX
-- Florida Blue
-- Aetna
-- Cigna
-- Any other added payer
-- Auto
-
-Verify:
-
-- OCR
-- PDF Processing
-- Assignment Logic
-- File Renaming
-- Logging
-- UI Functionality
-
----
-
-## User Acceptance Testing
-
-Before release:
-
-- Validate collector assignment
-- Validate OCR extraction
-- Validate output folders
-- Validate CSV log generation
-
----
+***Complete the respective checklist for each module.***
 
 ## Release Packaging
 
 Package contents:
 
 ```text
-MR_Letters_Generator/
+RPA_Letters/
 README
 User Manual
 License
+ Medical Records Documentation
+ Correspondence Documentation
 ```
+
+---
+
+## Build Optimization
+
+Before generating a production build:
+
+- Remove temporary debug code
+- Exclude test files
+- Exclude development documentation not required by end users
+- Include only runtime dependencies
+- Verify bundled assets
 
 ---
 
